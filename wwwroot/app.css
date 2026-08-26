@@ -1,0 +1,1910 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f4f4f4;
+}
+
+/* Login view */
+.login-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.login-box {
+  background: #fff;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  width: 320px;
+  text-align: center;
+}
+
+.login-logo {
+  width: 100px;
+  height: 100px;
+  margin-bottom: 10px;
+}
+
+.login-box h1 {
+  font-size: 20px;
+  margin: 0 0 20px 0;
+  color: #266e5a;
+}
+
+.login-box form {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.login-box label {
+  font-size: 13px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  color: #444;
+}
+
+.login-box input {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.login-box button {
+  margin-top: 20px;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  background: #266e5a;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.login-box button:hover {
+  background: #1d5847;
+}
+
+.login-error {
+  margin-top: 10px;
+  color: #c0392b;
+  font-size: 13px;
+}
+
+/* App shell */
+.app-view {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 160px;
+  background: #1f2a6e;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 10px;
+}
+
+.sidebar-nav button {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #cfd8dc;
+  text-align: left;
+  padding: 12px 20px;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.sidebar-nav button:hover,
+.sidebar-nav button.active {
+  background: #266e5a;
+  color: #fff;
+  border-radius: 8px;
+}
+
+.nav-section-title {
+  padding: 16px 20px 6px 20px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #78909c;
+}
+
+.sidebar-nav button.nav-item-sub {
+  padding-left: calc(20px + 1em);
+}
+
+.main-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  height: 56px;
+  background: #aae;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.topbar button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 1em;
+  background: #265a8e;
+  color: #fff;
+  cursor: pointer;
+  border-bottom: 1px solid #367aae;
+  font-size: 18px;
+}
+
+.topbar button.danger {
+  background: #c0392b;
+}
+
+.topbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.topbar button.scheduling-nav-btn {
+  padding: 0;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.topbar-fallback {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #1f2a6e;
+}
+
+.topbar-fallback-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.topbar-fallback-title {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+
+/* Topbar print button (Giorno/Settimana only, see loadView) - plain icon button,
+   same footprint as the account menu button next to it. Styled via the #print-button
+   ID (not just the .topbar-print-button class) because ".topbar button" combines an
+   element + class selector and so is MORE specific than a single class alone - an ID
+   selector is the simple way to reliably win regardless of that. */
+#print-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: #eef1f0;
+  color: #333;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+#print-button:hover {
+  background: #e0e5e3;
+}
+
+/* Account menu (top-right) */
+.account-menu {
+  position: relative;
+}
+
+.account-menu-button {
+  background: #eef1f0;
+  color: #333;
+}
+
+.account-menu-button::after {
+  content: " \25BE";
+}
+
+.account-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 250px;
+  z-index: 500;
+  margin-top: 4px;
+  margin-right: -10px;
+  background-color: #265a8e;
+  border-radius: 8px;
+  padding: 12px 8px;
+}
+
+.account-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.account-menu-item:hover {
+  background: #367aae;
+}
+
+.account-menu-item.active-toggle {
+  color: #beca26;
+  font-weight: bold;
+}
+
+.account-menu-item.active-toggle::before {
+  content: '✓ ';
+}
+
+.account-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 8px 4px;
+}
+
+/* Utenti: list */
+.filter-input {
+  width: 100%;
+  max-width: 320px;
+  padding: 8px;
+  margin-bottom: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid #eee;
+}
+
+.data-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #78909c;
+}
+
+.data-table tbody tr {
+  cursor: pointer;
+}
+
+.data-table tbody tr:hover {
+  background: #f4f4f4;
+}
+
+.data-table tr.removed-row {
+  color: #999;
+  font-style: italic;
+}
+
+/* Pazienti: filter box, sortable headers, pagination */
+.patients-filter-wrap {
+  position: relative;
+  max-width: 380px;
+  margin-bottom: 14px;
+}
+
+.patients-filter-input {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.patients-filter-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #78909c;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.patients-filter-clear:hover {
+  color: #c0392b;
+}
+
+.patients-sort-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.patients-sort-header.sort-asc::after {
+  content: ' \25B2';
+}
+
+.patients-sort-header.sort-desc::after {
+  content: ' \25BC';
+}
+
+.patients-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.patients-page-info {
+  font-size: 13px;
+  color: #444;
+}
+
+/* Utenti: form */
+.form-box {
+  background: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 98%;
+}
+
+.form-box.form-box-wide {
+  max-width: 1400px;
+}
+
+.form-box.form-box-grid {
+  overflow: auto;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 24px;
+  background: #fff;
+  border-radius: 8px;
+  max-width: 960px;
+  margin: 1em;
+}
+
+.form-box.form-box-grid.form-box-wide {
+  max-width: 1400px;
+}
+
+.form-box-full-row {
+  grid-column: 1 / -1;
+}
+
+.form-box label {
+  display: block;
+  font-size: 13px;
+  margin-top: 14px;
+  margin-bottom: 4px;
+  color: #444;
+}
+
+.form-box input,
+.form-box select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-box input[type="color"] {
+  padding: 1px;
+}
+
+.form-box .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.form-box .checkbox-row input {
+  width: auto;
+}
+
+.readonly-banner {
+  background: #fdf3d0;
+  color: #7a5b00;
+  padding: 10px 14px;
+  border-radius: 4px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.vacation-monthday-row {
+  display: flex;
+  gap: 10px;
+}
+
+.vacation-monthday-row select {
+  width: auto;
+  flex: 1;
+}
+
+/* Impostazioni: only the Valore cell is interactive, auto-saves on change */
+.setting-value-input {
+  width: 100px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.save-success {
+  border-color: #266e5a !important;
+  box-shadow: 0 0 0 2px rgba(38, 110, 90, 0.25);
+}
+
+.save-error {
+  border-color: #c0392b !important;
+  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.25);
+}
+
+.form-error {
+  display: none;
+  color: #c0392b;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.field-wrap {
+  position: relative;
+}
+
+.patient-document-wrap {
+  margin: 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.patient-document-icon {
+  width: 48px;
+  height: 48px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.patient-document-icon:hover {
+  border-color: #266e5a;
+}
+
+.patient-document-link {
+  cursor: pointer;
+  color: #266e5a;
+  font-weight: bold;
+}
+
+.patient-document-link:hover {
+  text-decoration: underline;
+}
+
+/* Pazienti: Terapia section (summary display + inline Aggiungi/Modifica editor) */
+.patient-therapy-section {
+  margin-top: 14px;
+}
+
+.therapy-summary {
+  background: #f4f4f4;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+}
+
+.therapy-summary-name {
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.therapy-parts-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+}
+
+.therapy-buttons-row {
+  display: flex;
+  gap: 10px;
+}
+
+.therapy-parts-editor {
+  margin: 10px 0;
+}
+
+.therapy-part-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.therapy-part-row select {
+  flex: 2;
+}
+
+.therapy-part-row input[type="number"] {
+  flex: 1;
+  width: auto;
+}
+
+.therapy-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.therapy-buttons-row button,
+.therapy-actions-row button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 1em;
+  background: #265a8e;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.therapy-buttons-row button.danger,
+.therapy-actions-row button.danger {
+  background: #c0392b;
+}
+
+.therapy-buttons-row button:disabled,
+.therapy-actions-row button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.required-marker::after {
+  content: '*';
+  color: #c0392b;
+  position: absolute;
+  top: 6px;
+  right: -10px;
+  font-size: 24px;
+}
+
+/* Utenti: therapist weekly availability grid */
+.availability-section {
+  max-width: none;
+}
+
+.availability-not-yet-note {
+  color: #78909c;
+  font-size: 13px;
+  font-style: italic;
+  margin-top: 6px;
+}
+
+.availability-columns {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin-top: 6px;
+  overflow-x: auto;
+}
+
+.availability-column {
+  flex: 1 1 240px;
+  min-width: 0;
+  background: #f4f4f4;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.availability-column-header {
+  font-size: 13px;
+  font-weight: bold;
+  color: #444;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.availability-slot {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin-bottom: 6px;
+  background: #fff;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.availability-slot-times {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.availability-time-box {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  min-width: 52px;
+}
+
+.availability-time-box:hover {
+  border-color: #266e5a;
+}
+
+.time-picker-popup {
+  position: absolute;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  max-height: 280px;
+  overflow-y: auto;
+  min-width: 70px;
+}
+
+.time-picker-row {
+  padding: 6px 12px;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.time-picker-row:hover {
+  background: #e8f0ee;
+}
+
+.time-picker-row.selected {
+  background: #266e5a;
+  color: #fff;
+}
+
+.availability-remove {
+  border: none;
+  background: #c0392b;
+  color: #fff;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.availability-add-btn {
+  width: 100%;
+  border: none;
+  background: #266e5a;
+  color: #fff;
+  border-radius: 4px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Modal (confirmations, etc.): 2/3 width and height, centered, actions at bottom */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  width: 50vw;
+  height: 66.6667vh;
+  background: #fff;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-body {
+  flex: 1;
+  padding: 20px;
+  overflow: auto;
+}
+
+.modal-body input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.modal-error {
+  color: #c0392b;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.modal-actions {
+  padding: 15px 20px;
+  border-top: 1px solid #ddd;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.modal-actions button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #266e5a;
+  color: #fff;
+}
+
+.modal-actions button.danger {
+  background: #c0392b;
+}
+
+.modal-actions button.modal-btn-left {
+  margin-right: auto;
+}
+
+/* Slot detail popup (Giorno/Settimana) - therapy name on a band colored from
+   TherapyType.Color, then date/time, patient (bold), therapist/Reparto. */
+.slot-detail-band {
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.slot-detail-therapy-name {
+  font-weight: bold;
+  font-size: 16px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.slot-detail-datetime {
+  color: #555;
+  margin-bottom: 10px;
+}
+
+.slot-detail-patient {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.slot-detail-therapist {
+  color: #555;
+}
+
+/* "Cambia terapista" sub-popup - each therapist shown as a bordered, button-like
+   row rather than a plain list line. */
+.change-therapist-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.change-therapist-line {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.change-therapist-line:hover {
+  background: #f0f4f8;
+  border-color: #266e5a;
+}
+
+.change-therapist-unavailable {
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+.change-therapist-unavailable:hover {
+  background: none;
+  border-color: #ccc;
+}
+
+.slot-details-line {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.slot-details-line:hover {
+  background: #f0f4f8;
+}
+
+/* "Stato" line inside the slot detail popup - label + dropdown, applies the
+   status change immediately on selection (no separate Apply button). */
+.slot-detail-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.slot-detail-status-row label {
+  font-weight: bold;
+  color: #555;
+}
+
+.slot-detail-status-row select {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* Capacity debug popup (Giorno/Settimana, Admin only) */
+.capacity-debug-rates {
+  color: #777;
+  font-size: 13px;
+  margin-top: -4px;
+}
+
+.capacity-debug-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.capacity-debug-table th,
+.capacity-debug-table td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.capacity-debug-counted {
+  color: #1e7a3d;
+}
+
+.capacity-debug-excluded {
+  color: #aaa;
+}
+
+/* Giorno / Settimana scheduling scaffolding */
+.scheduling-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Wraps the therapist/Reparto select + patient autocomplete (buildEntitySelector) as
+   a single flex item inside .scheduling-header, preserving the same 12px gap between
+   them that a flat list of direct children would have had. */
+.entity-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.scheduling-therapist-select {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.pianificazione-showalso-label {
+  font-size: 14px;
+  color: #444;
+  white-space: nowrap;
+}
+
+.scheduling-nav-btn {
+  border: none;
+  background: #266e5a;
+  color: #fff;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.scheduling-date-label {
+  font-weight: bold;
+  min-width: 140px;
+  text-align: center;
+}
+
+.scheduling-empty {
+  color: #78909c;
+  font-style: italic;
+  padding: 20px;
+}
+
+/* Stampa (print preview): the entity name + date/week that used to live in the normal
+   Giorno/Settimana topbar header now lives here instead, inside #content, since the
+   topbar itself is hidden entirely once actually printing (see @media print below). */
+.stampa-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stampa-header {
+  margin-bottom: 16px;
+}
+
+.stampa-header-entity {
+  font-size: 20px;
+  font-weight: bold;
+  color: #1f2a6e;
+}
+
+.stampa-header-date {
+  font-size: 15px;
+  color: #555;
+  margin-top: 2px;
+}
+
+/* Piano's own header (separate from .stampa-header above, see buildPianoHeader) -
+   title on the left, Centro Minerva logo + caption on the right. */
+.piano-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.piano-header-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.piano-header-logo img {
+  height: 60px;
+  width: auto;
+}
+
+.piano-header-logo-caption {
+  font-size: 12px;
+  font-weight: bold;
+  color: #1f2a6e;
+  margin-top: 2px;
+}
+
+/* Piano (patient plan): a plain report table, not a time grid like Giorno/Settimana -
+   no fixed row heights or fit-to-page sizing, it just reads/prints as an ordinary list. */
+.piano-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.piano-table th,
+.piano-table td {
+  border: 1px solid #ccc;
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.piano-table thead th {
+  background: #f4f4f4;
+  font-weight: bold;
+}
+
+.piano-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+/* Avvisi: alert card grid */
+.alerts-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+
+.alert-card {
+  background: #fff;
+  border-left: 5px solid #c0392b;
+  border-radius: 6px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+
+.alert-card:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.alert-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.alert-card-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.alert-card-title {
+  font-weight: bold;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-card-line1,
+.alert-card-line2 {
+  color: #555;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-card-line2 {
+  margin-bottom: 10px;
+}
+
+.alert-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.alert-card-go-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 4px;
+  background: #266e5a;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.alert-card-go-btn:hover {
+  background: #1e5847;
+}
+
+.scheduling-grid {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.scheduling-grid th,
+.scheduling-grid td {
+  border: 1px solid #8da7f1;
+  padding: 4px 8px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.scheduling-grid thead th {
+  background: #f4f4f4;
+}
+
+.scheduling-time-cell {
+  background: #fafafa;
+  font-weight: bold;
+  white-space: nowrap;
+  width: 10em;
+}
+
+.vacation-overlay {
+  background: #eba3a3;
+  color: #a13a3a;
+  font-weight: bold;
+  vertical-align: middle;
+}
+
+.availability-overlay {
+  background: #edb2b2;
+  vertical-align: middle;
+}
+
+/* Pianificazione: week-view cell states */
+.pianificazione-progress {
+  font-size: 14px;
+  color: #444;
+  margin-bottom: 10px;
+}
+
+.conflict-warning {
+  font-size: 24px;
+  font-weight: bold;
+  color: red;
+}
+
+.pianificazione-drop-highlight {
+  position: absolute;
+  box-sizing: border-box;
+  border: 3px solid #1976D2;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Pianificazione: fixed equal-width columns, fixed row height, no cell padding -
+   TDs are pure grid structure now; actual session content is drawn via absolutely
+   positioned overlay divs injected into a session's starting row's <td> (which is
+   why every td needs position:relative - the div anchors to its own specific cell
+   but visually spans down over subsequent rows, since overflow is left visible). */
+.pianificazione-grid {
+  table-layout: fixed;
+}
+
+.pianificazione-grid th:first-child {
+  width: 10em;
+}
+
+.pianificazione-grid th,
+.pianificazione-grid td {
+  box-sizing: border-box;
+  padding: 0;
+  height: 24px;
+}
+
+.pianificazione-grid td {
+  position: relative;
+}
+
+.pianificazione-grid .scheduling-time-cell {
+  padding: 0 8px;
+}
+
+.pianificazione-empty-cell {
+  cursor: pointer;
+}
+
+.pianificazione-empty-cell:hover {
+  background: #ebacd8;
+}
+
+.pianificazione-today-header {
+  background: #fff59d !important;
+}
+
+.pianificazione-today-col {
+  background: #fffde7;
+}
+
+.pianificazione-empty-cell.pianificazione-today-col:hover {
+  background: #ebacd8;
+}
+
+.pianificazione-cell-label {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* One overlay div per session, anchored (position:absolute) within its starting
+   row's <td>, height computed in JS as rows * 24px so it visually spans forward
+   over subsequent rows regardless of how many the session's duration covers. */
+.pianificazione-session-overlay {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 4px;
+  padding: 1px 3px;
+  font-size: 16px;
+  z-index: 2;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pianificazione-occupied-other {
+  background: #ffe0b2;
+  color: #8a5a00;
+}
+
+.pianificazione-occupied-same {
+  background: #b2ebf2;
+  color: #00646d;
+}
+
+.pianificazione-draft {
+  background: #a5d6a7;
+}
+
+.pianificazione-ripianifica-draft {
+  outline: 3px solid #1976D2;
+  outline-offset: -3px;
+  box-shadow: 0 0 8px rgba(25, 118, 210, 0.6);
+  cursor: grab;
+  z-index: 6;
+}
+
+.pianificazione-conflict {
+  background: #ffb3b3;
+  border: 2px dashed #c0392b;
+}
+
+.pianificazione-showalso {
+  background: repeating-linear-gradient(
+    45deg,
+    #e0e0e0,
+    #e0e0e0 6px,
+    #ececec 6px,
+    #ececec 12px
+  );
+  color: #555;
+  border: 1px dashed #9e9e9e;
+  cursor: default;
+}
+
+.pianificazione-draft .availability-remove,
+.pianificazione-conflict .availability-remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  z-index: 3;
+}
+
+.pianificazione-rimpiazza-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1f2a6e;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.pianificazione-rimpiazza-row.disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pianificazione-week-fade {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.pianificazione-week-fade.pianificazione-week-fade-in {
+  opacity: 1;
+}
+
+/* Pianificazione Reparto: capacity background - white (no class) means plenty of
+   room, yellow = near capacity (reuses the old "orange" bucket's color), red = hard
+   block (no availability at all). */
+.pianificazione-capacity-yellow {
+  background: #ffcc80;
+}
+
+.pianificazione-capacity-red {
+  background: #ef9a9a;
+  cursor: not-allowed;
+}
+
+/* Reparto cell: a small always-visible count badge in the corner (clickable to open
+   the detail popup), draft overlays are constrained to calc(100% - 2em) width in JS
+   so they never overlap this badge's reserved corner. */
+.pianificazione-reparto-count {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1.6em;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  color: #265a8e;
+  cursor: pointer;
+  z-index: 3;
+  border-left: 1px solid #ddd;
+}
+
+.pianificazione-reparto-count:hover {
+  background: #dce7f5;
+}
+
+.giorno-settimana-cell {
+  cursor: default;
+}
+
+.giorno-settimana-cell-dragover {
+  background: #d7e8f7 !important;
+  outline: 2px solid #266e5a;
+  outline-offset: -2px;
+}
+
+.pianificazione-reparto-cell {
+  cursor: pointer;
+}
+
+.pianificazione-reparto-cell:hover {
+  filter: brightness(0.97);
+}
+
+.pianificazione-capacity-red.pianificazione-reparto-cell {
+  cursor: not-allowed;
+}
+
+.pianificazione-capacity-red.pianificazione-reparto-cell:hover {
+  filter: none;
+}
+
+/* Pianificazione Mixed: Reparto capacity background stays purely informational
+   (it never blocks Heavy placement) - a cell is only actually unclickable here
+   when it falls outside the selected Palestra therapist's own availability. */
+.pianificazione-mixed-unavailable {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Heavy vs Light overlay boxes are visually distinguished (light gets a dashed
+   border) even though both use the same draft/conflict background colors. */
+.pianificazione-mixed-light-overlay {
+  border: 1px dashed rgba(0, 0, 0, 0.35);
+}
+
+.giorno-vacation-label {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #a13a3a;
+  z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 2em);
+}
+
+/* Pianificazione: edge-of-content gradient overlay bars for drag-hover week
+   navigation. Positioned dynamically via JS (getBoundingClientRect), invisible
+   until a drag's pointer enters their region, pointer-events:none so a drop
+   there passes straight through to the real grid cell underneath. */
+.pianificazione-edge-overlay {
+  position: fixed;
+  width: 5em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1000;
+}
+
+.pianificazione-edge-overlay.pianificazione-edge-overlay-visible {
+  opacity: 1;
+}
+
+.pianificazione-edge-overlay-left {
+  background: linear-gradient(90deg, rgba(12, 68, 237, 1) 0%, rgba(7, 238, 242, 0.1) 100%);
+}
+
+.pianificazione-edge-overlay-right {
+  background: linear-gradient(270deg, rgba(12, 68, 237, 1) 0%, rgba(7, 238, 242, 0.1) 100%);
+}
+
+/* Narrow landscape screens crowd the topbar action buttons - step the font size
+   down in two stages (portrait/tablet is unaffected, buttons just wrap there).
+   The logo/title icon is dropped entirely at the same first breakpoint to free
+   up room, since it's decorative and not needed once space is tight.
+   These blocks are placed at the very end of the file on purpose: every selector
+   here (.topbar button, .scheduling-date-label, .pianificazione-rimpiazza-row,
+   etc.) also has an unconditional base rule elsewhere with equal specificity -
+   with equal specificity the LAST rule in source order wins regardless of the
+   media query, so these have to stay last or the base rule silently overrides
+   them even while the media condition is true. */
+@media (max-width: 1400px) and (orientation: landscape) {
+  .topbar {
+    padding: 0;
+  }
+
+  .topbar-left {
+    gap: 8px;
+  }
+
+  .scheduling-header {
+    gap: 8px;
+  }
+
+  .topbar button {
+    font-size: 14px;
+  }
+
+  .topbar button.scheduling-nav-btn {
+    font-size: 20px;
+  }
+
+  .scheduling-date-label {
+    min-width: 90px;
+  }
+
+  .scheduling-header select {
+    font-size: 10px;
+  }
+
+  .pianificazione-rimpiazza-row {
+    font-size: 10px;
+  }
+
+  .topbar-fallback-icon {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) and (orientation: landscape) {
+  .topbar {
+    padding: 0;
+  }
+
+  .topbar-left {
+    gap: 8px;
+  }
+
+  .scheduling-header {
+    gap: 8px;
+  }
+
+  .topbar button {
+    font-size: 10px;
+  }
+
+  .topbar button.scheduling-nav-btn {
+    font-size: 16px;
+  }
+
+  .scheduling-date-label {
+    min-width: 70px;
+  }
+
+  .scheduling-header select {
+    font-size: 10px;
+  }
+
+  .pianificazione-rimpiazza-row {
+    font-size: 10px;
+  }
+}
+
+/* Stampa (print preview) - printed output only, screen appearance is untouched.
+   Reached only via the Giorno/Settimana print button, so this only ever needs to
+   cover the Giorno/Settimana grid's own classes, not every class in the app.
+   Orientation (portrait for Giorno, landscape for Settimana) is set per print job by
+   JS (setStampaPageOrientation), since @page can't be conditionally scoped by a class -
+   no "size" here on purpose.
+   margin:0 here (instead of a normal page margin) is a common trick to suppress the
+   browser's own print header/footer (date, page title/URL, page number) - Chrome/Edge
+   drop those once the page has no margin to put them in. The visual margin readers
+   still need is added back as ordinary .content padding below instead. */
+@media print {
+  @page {
+    margin: 0;
+  }
+
+  .sidebar,
+  .topbar {
+    display: none !important;
+  }
+
+  .main-page {
+    margin: 0;
+  }
+
+  .content {
+    padding: 1.2cm;
+    overflow: visible;
+  }
+
+  /* Strip every colored background from the grid - a printed copy should be plain
+     black-on-white: borders, text and labels stay, fills go transparent/white. */
+  .scheduling-grid thead th,
+  .scheduling-time-cell,
+  .pianificazione-capacity-yellow,
+  .pianificazione-capacity-red,
+  .vacation-overlay,
+  .availability-overlay {
+    background: none !important;
+  }
+
+  .vacation-overlay,
+  .giorno-vacation-label,
+  .pianificazione-reparto-count {
+    color: #000 !important;
+  }
+
+  /* The Reparto-colored session boxes get their background/border set as an inline
+     style by JS (buildScheduleGridTable) - only !important can override an inline
+     style, same reasoning as the existing capacity-color/vacation-overlay cascade
+     quirk documented elsewhere in this file. */
+  .pianificazione-session-overlay {
+    background: none !important;
+    border: 1px solid #000 !important;
+    color: #000 !important;
+  }
+
+  .scheduling-grid th,
+  .scheduling-grid td {
+    border-color: #000;
+  }
+
+  /* Piano's table only ever had light zebra-striping/header shading, not the same
+     status colors as the Giorno/Settimana grid - stripped anyway for consistency
+     with "no color at all" when printed. */
+  .piano-table th,
+  .piano-table td {
+    border-color: #000;
+  }
+
+  .piano-table thead th,
+  .piano-table tbody tr:nth-child(even) {
+    background: none;
+  }
+}
+
+/* Pacchetti */
+.pacchetto-scope-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pacchetto-scope-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.pacchetto-grid input,
+.pacchetto-grid select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pacchetto-item-full-price,
+.pacchetto-item-final-price {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.pacchetto-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0;
+}
+
+
+/* Presenze */
+.presenze-overlay {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.presenze-overlay .pianificazione-cell-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presenze-audit-line {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+.alert-popup-jump-btn {
+  background: none;
+  border: none;
+  color: #1976D2;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+/* Mese */
+.mese-table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mese-table th {
+  text-align: center;
+  border: 2px solid #888;
+  padding: 6px;
+}
+
+.mese-cell {
+  vertical-align: top;
+  height: 110px;
+  padding: 8px;
+  border: 2px solid #888;
+  cursor: pointer;
+}
+
+.mese-cell:hover {
+  outline: 3px solid #266e5a;
+  outline-offset: -3px;
+}
+
+.mese-cell-outside {
+  background: #f7f7f7;
+  cursor: default;
+}
+
+.mese-cell-outside:hover {
+  outline: none;
+}
+
+.mese-cell-daynum {
+  font-weight: bold;
+  color: #333;
+  font-size: 32px;
+  margin-bottom: 6px;
+}
+
+.mese-cell-vacation-bg {
+  background: #eba3a3;
+}
+
+.mese-cell-vacation {
+  font-size: 16px;
+  font-weight: bold;
+  color: #a13a3a;
+  margin-bottom: 6px;
+}
+
+.mese-cell-counts {
+  font-size: 24px;
+  color: #1a1a1a;
+  font-weight: bold;
+}
+
+.form-box .PacketTypeRadio {
+  width: 2em;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.pacchetto-confirm-costs {
+  background: #f4f4f4;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.pacchetto-confirm-final-cost,
+.pacchetto-final-cost {
+  font-weight: bold;
+  color: #1e5847;
+}
+
+.pacchetto-search-name-row {
+  display: flex;
+  gap: 10px;
+}
+
+.pacchetto-search-name-row input {
+  flex: 1;
+}
+
+/* Gestisci assenza */
+.gestisci-assenza-table {
+  table-layout: auto;
+  width: auto;
+}
+
+.gestisci-assenza-table th,
+.gestisci-assenza-table td {
+  white-space: nowrap;
+  padding: 6px 14px 6px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.gestisci-assenza-therapist-row td {
+  font-weight: bold;
+  font-size: 16px;
+  color: #266e5a;
+  background: #f4f4f4;
+  border-bottom: 2px solid #266e5a;
+  padding-top: 12px;
+}
+
+.gestisci-assenza-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+/* Welcome overlay - shown once per real page load, see showApp() */
+.welcome-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.welcome-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 40px 50px;
+  text-align: center;
+  max-width: 30vw;
+}
+
+.welcome-logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  margin-bottom: 10px;
+}
+
+.welcome-title {
+  margin: 0 0 20px;
+  color: #266e5a;
+}
+
+.welcome-greeting {
+  font-size: 48px;
+  font-weight: bold;
+  text-transform: capitalize;
+  color: #1a1a8a;
+  margin-bottom: 2em;
+  text-shadow: 3px 1px 4px #1a3afa;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+}
+
+.HelloButtons {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 1em;
+  background: #265a8e;
+  color: #fff;
+  cursor: pointer;
+  border-bottom: 1px solid #367aae;
+  font-size: 18px;
+}
+
+.scheduling-date-label-clickable {
+  cursor: pointer;
+}
+
+.quick-date-picker-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  font-weight: bold;
+}
+
+.quick-date-picker-table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.quick-date-picker-cell {
+  height: 40px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid #ccc;
+}
+
+.quick-date-picker-cell:hover {
+  background: #f0f0f0;
+}
+
+.quick-date-picker-cell.mese-cell-outside {
+  cursor: default;
+}
+
+.quick-date-picker-cell.mese-cell-outside:hover {
+  background: none;
+}
+
+.alerts-grid-important {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #eee;
+}
+
+.alert-card-important {
+  border-top: 1px solid red;
+  border-right: 1px solid red;
+  border-bottom: 1px solid red;
+  border-left-width: 5px;
+  border-left-style: solid;
+}

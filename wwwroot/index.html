@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planning FKT</title>
+  <link rel="icon" type="image/png" href="planningfkt.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+  <div id="login-view" class="login-view">
+    <div class="login-box">
+      <img src="planningfkt.png" alt="Planning FKT" class="login-logo">
+      <h1>Planning FKT</h1>
+      <form id="login-form">
+        <label for="login-name">Nome utente</label>
+        <input type="text" id="login-name" name="name" autocomplete="username" required>
+
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" name="password" autocomplete="current-password" required>
+
+        <div id="login-error" class="login-error">Nome utente o password non validi.</div>
+
+        <button type="submit">Accedi</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="app-view" class="app-view">
+    <aside id="sidebar" class="sidebar">
+      <nav id="sidebar-nav" class="sidebar-nav">
+        <button type="button" class="nav-item" data-view="presenze">Presenze</button>
+        <button type="button" class="nav-item" data-view="giorno">Giorno</button>
+        <button type="button" class="nav-item" data-view="settimana">Settimana</button>
+        <button type="button" class="nav-item" data-view="mese">Mese</button>
+        <button type="button" class="nav-item" data-view="pazienti">Pazienti</button>
+
+        <div id="gestione-section" class="nav-section">
+          <div class="nav-section-title">Gestione</div>
+          <button type="button" class="nav-item nav-item-sub" data-view="avvisi">Avvisi</button>
+          <button type="button" class="nav-item nav-item-sub" data-view="utenti">Utenti</button>
+          <button type="button" class="nav-item nav-item-sub" data-view="assenze">Vacanze</button>
+          <button type="button" class="nav-item nav-item-sub" data-view="terapie">Terapie</button>
+          <button type="button" class="nav-item nav-item-sub" data-view="impostazioni">Impostazioni</button>
+          <button type="button" class="nav-item nav-item-sub" data-view="pacchetti">Pacchetti</button>
+          <button type="button" class="nav-item nav-item-sub" data-view="gestisciAssenza">Gestisci assenza</button>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="main-page">
+      <header id="topbar" class="topbar">
+        <div class="topbar-left">
+          <div id="topbar-fallback" class="topbar-fallback">
+            <img src="planningfkt.png" alt="" class="topbar-fallback-icon">
+            <span id="topbar-fallback-title" class="topbar-fallback-title"></span>
+          </div>
+
+          <div id="topbar-actions" class="topbar-actions">
+            <!-- contextual action buttons, populated per page -->
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button type="button" id="print-button" class="topbar-print-button" title="Stampa">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+          </button>
+
+          <div id="account-menu" class="account-menu">
+            <button type="button" id="account-menu-button" class="account-menu-button"></button>
+            <div id="account-menu-dropdown" class="account-menu-dropdown">
+              <button type="button" id="toggle-removed" class="account-menu-item">Vedi elementi rimossi</button>
+              <button type="button" id="toggle-audit" class="account-menu-item">Vedi Audit</button>
+              <button type="button" id="toggle-capacity-debug" class="account-menu-item">Mostra informazioni celle</button>
+              <div class="account-menu-divider"></div>
+              <button type="button" id="logout-button" class="account-menu-item">Esci</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main id="content" class="content">
+        <!-- page content, populated per page -->
+      </main>
+    </div>
+  </div>
+
+  <div id="modal-overlay" class="modal-overlay">
+    <div id="modal" class="modal">
+      <div id="modal-body" class="modal-body"></div>
+      <div id="modal-actions" class="modal-actions"></div>
+    </div>
+  </div>
+
+  <div id="welcome-overlay" class="welcome-overlay">
+    <div class="welcome-box">
+      <img src="planningfkt.png" alt="Planning FKT" class="welcome-logo">
+      <h1 class="welcome-title">Planning FKT</h1>
+      <p class="welcome-greeting" id="welcome-greeting-text"></p>
+      <div class="welcome-actions">
+        <button type="button" id="welcome-switch-user-button" class="HelloButtons">Cambia utente</button>
+        <button type="button" id="welcome-continue-button" class="HelloButtons">Continua</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

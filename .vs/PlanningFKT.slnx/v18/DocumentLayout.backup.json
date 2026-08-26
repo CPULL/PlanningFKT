@@ -1,0 +1,189 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\controllers\\appcontroller.alerts.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:controllers\\appcontroller.alerts.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\controllers\\appcontroller.giorno.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:controllers\\appcontroller.giorno.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\controllers\\appcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:controllers\\appcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\models\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:models\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\wwwroot\\app.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:wwwroot\\app.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\models\\therapypacket.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:models\\therapypacket.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\models\\therapypacketitem.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:models\\therapypacketitem.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\models\\therapypacketconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:models\\therapypacketconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|c:\\users\\claud\\desktop\\prjs\\planningfkt\\wwwroot\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{43E2202C-52EF-BFEF-B467-B0A97C31A213}|PlanningFKT.csproj|solutionrelative:wwwroot\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 3,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "AppController.Giorno.cs",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Controllers\\AppController.Giorno.cs",
+              "RelativeDocumentMoniker": "Controllers\\AppController.Giorno.cs",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Controllers\\AppController.Giorno.cs",
+              "RelativeToolTip": "Controllers\\AppController.Giorno.cs",
+              "ViewState": "AgIAAJsAAAAAAAAAAAAawLQAAAADAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T11:17:37.736Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "AppController.cs",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Controllers\\AppController.cs",
+              "RelativeDocumentMoniker": "Controllers\\AppController.cs",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Controllers\\AppController.cs",
+              "RelativeToolTip": "Controllers\\AppController.cs",
+              "ViewState": "AgIAABoAAAAAAAAAAAAmwDEAAAAxAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T11:17:21.121Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "AppController.Alerts.cs",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Controllers\\AppController.Alerts.cs",
+              "RelativeDocumentMoniker": "Controllers\\AppController.Alerts.cs",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Controllers\\AppController.Alerts.cs",
+              "RelativeToolTip": "Controllers\\AppController.Alerts.cs",
+              "ViewState": "AgIAAAwCAAAAAAAAAAAWwCICAAAHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T11:16:32.648Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "AppDbContext.cs",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Models\\AppDbContext.cs",
+              "RelativeDocumentMoniker": "Models\\AppDbContext.cs",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Models\\AppDbContext.cs",
+              "RelativeToolTip": "Models\\AppDbContext.cs",
+              "ViewState": "AgIAAI0AAAAAAAAAAAAewKQAAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-24T11:08:29.447Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "TherapyPacket.cs",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Models\\TherapyPacket.cs",
+              "RelativeDocumentMoniker": "Models\\TherapyPacket.cs",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Models\\TherapyPacket.cs",
+              "RelativeToolTip": "Models\\TherapyPacket.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-24T10:50:20.531Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "TherapyPacketItem.cs",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Models\\TherapyPacketItem.cs",
+              "RelativeDocumentMoniker": "Models\\TherapyPacketItem.cs",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Models\\TherapyPacketItem.cs",
+              "RelativeToolTip": "Models\\TherapyPacketItem.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-24T10:50:08.054Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "TherapyPacketConfig.cs",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Models\\TherapyPacketConfig.cs",
+              "RelativeDocumentMoniker": "Models\\TherapyPacketConfig.cs",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Models\\TherapyPacketConfig.cs",
+              "RelativeToolTip": "Models\\TherapyPacketConfig.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-24T10:49:48.772Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "index.html",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\wwwroot\\index.html",
+              "RelativeDocumentMoniker": "wwwroot\\index.html",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\wwwroot\\index.html",
+              "RelativeToolTip": "wwwroot\\index.html",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABsAAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
+              "WhenOpened": "2026-08-24T06:28:11.804Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAADsAAAAAAAAAAAAewGEAAAAlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-29T11:21:57.102Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "app.js",
+              "DocumentMoniker": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\wwwroot\\app.js",
+              "RelativeDocumentMoniker": "wwwroot\\app.js",
+              "ToolTip": "C:\\Users\\claud\\Desktop\\Prjs\\PlanningFKT\\wwwroot\\app.js",
+              "RelativeToolTip": "wwwroot\\app.js",
+              "ViewState": "AgIAANkaAAAAAAAAAAAlwN4aAAAkAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-07-29T10:03:53.229Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
