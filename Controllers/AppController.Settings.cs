@@ -46,6 +46,14 @@ public partial class AppController {
     return Ok(list);
   }
 
+  // Only these two pairs currently exist among Settings keys - CPU: "make sure
+  // start hours and min values are lower than end hours and max values". Keyed
+  // both ways so the check applies whichever half of the pair is being edited.
+  private static readonly Dictionary<string, string> SettingUpperBoundByLowerKey = new() {
+    ["AvailabilityStart"] = "AvailabilityEnd",
+    ["PacchettoScontoMinimo"] = "PacchettoScontoMassimo"
+  };
+
   [HttpPut("/Settings/Update/{id}")]
   public IActionResult SettingsUpdate(int id, [FromBody] SettingUpdateRequest request) {
     if (!IsCurrentUserAccettazione()) {
@@ -62,6 +70,21 @@ public partial class AppController {
 
     if (setting == null) {
       return NotFound();
+    }
+
+    if (SettingUpperBoundByLowerKey.TryGetValue(setting.Key, out var upperKey)) {
+      var upperSetting = _db.Settings.FirstOrDefault(s => s.Key == upperKey);
+      if (upperSetting != null && request.Value >= upperSetting.Value) {
+        return BadRequest(new { message = "Il valore deve essere inferiore a \"" + upperKey + "\"." });
+      }
+    } else {
+      var lowerKeyEntry = SettingUpperBoundByLowerKey.FirstOrDefault(kv => kv.Value == setting.Key);
+      if (lowerKeyEntry.Key != null) {
+        var lowerSetting = _db.Settings.FirstOrDefault(s => s.Key == lowerKeyEntry.Key);
+        if (lowerSetting != null && request.Value <= lowerSetting.Value) {
+          return BadRequest(new { message = "Il valore deve essere superiore a \"" + lowerKeyEntry.Key + "\"." });
+        }
+      }
     }
 
     setting.Value = request.Value;

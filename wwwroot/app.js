@@ -6963,7 +6963,7 @@ $(function() {
     }, 800);
   }
 
-  function saveSetting(id, value, $el) {
+  function saveSetting(id, value, $el, onFail) {
     $.ajax({
       url: 'Settings/Update/' + id,
       method: 'PUT',
@@ -6973,8 +6973,13 @@ $(function() {
       .done(function() {
         flashSaveResult($el, true);
       })
-      .fail(function() {
+      .fail(function(jqXHR) {
         flashSaveResult($el, false);
+        if (onFail) {
+          onFail();
+        }
+        var message = (jqXHR.responseJSON && jqXHR.responseJSON.message) ? jqXHR.responseJSON.message : 'Salvataggio non riuscito.';
+        window.showModal('<p>' + message + '</p>', [{ label: 'Chiudi', className: 'secondary', onClick: function() {} }]);
       });
   }
 
@@ -7012,9 +7017,17 @@ $(function() {
             $box.on('click', function(e) {
               e.stopPropagation();
               openTimePicker($box, $box.data('slot'), function(newSlot) {
+                var previousSlot = $box.data('slot');
+                var previousText = $box.text();
                 $box.data('slot', newSlot);
                 $box.text(slotToTime(newSlot));
-                saveSetting(setting.id, newSlot, $box);
+                saveSetting(setting.id, newSlot, $box, function() {
+                  $box.data('slot', previousSlot);
+                  $box.text(previousText);
+                });
+                if (setting.key === 'AvailabilityStart' || setting.key === 'AvailabilityEnd') {
+                  availabilityRangeCache = null; // stale after either half of the pair changes - refetched on next use
+                }
               });
             });
 
@@ -7030,8 +7043,12 @@ $(function() {
                 return;
               }
 
+              var previousValue = setting.value;
               setting.value = newValue;
-              saveSetting(setting.id, newValue, $input);
+              saveSetting(setting.id, newValue, $input, function() {
+                setting.value = previousValue;
+                $input.val(previousValue);
+              });
             });
 
             $valueCell.append($input);
