@@ -90,3 +90,19 @@ public static class VacationPeriod {
   public const int AM = 0;
   public const int PM = 1;
 }
+
+// Every alert type Alerts/List can produce. Most are pure software - computed
+// fresh each request, never stored. Stored only when an alert is marked
+// "Importante!" (AlertMarkedImportant.Type) - kept mainly so we know which kind
+// each stored row is, for future use. TherapistChangeNotification is the one
+// exception that only ever exists as a stored row (see AlertMarkedImportant).
+public enum AlertType {
+  TherapyToBeScheduled,
+  RepeatedNoShow2,
+  RepeatedNoShow3,
+  VacationConflict,
+  TherapyRenewal,
+  TherapistUnderScheduled,
+  PastHolidayToUpdate,
+  TherapistChangeNotification
+}

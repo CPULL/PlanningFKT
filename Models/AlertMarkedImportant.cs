@@ -11,4 +11,15 @@ public class AlertMarkedImportant {
   public long Key { get; set; }
 
   public DateTime MarkedAt { get; set; }
+
+  // Which AlertType this row is - set on every row (CPU's call, "for future
+  // use"), not just the stored-only types below.
+  public AlertType Type { get; set; }
+
+  // Only set for TherapistChangeNotification - that type has no "computed"
+  // form at all, it only ever exists as a row here, created directly when a
+  // reassignment changes both the therapist and the time together. Points at
+  // the one TherapySlot that was reassigned (no history of the previous
+  // therapist/time is kept anywhere - CPU's call).
+  public int? SlotId { get; set; }
 }

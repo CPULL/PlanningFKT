@@ -799,21 +799,82 @@ public partial class AppController {
     }
 
     var span = GetSpanSlots(type);
-    var pool = type.Category == TherapyCategory.Palestra
-      ? GetPalestraDropdownTherapists()
-      : GetOrderedRepartoTherapists();
+    var patientCache = GetPatientEntityCache();
+    var partCache = GetPartCache();
+    var therapyCache = GetTherapyCache();
 
-    // The currently assigned therapist is always "available" for their own slot -
-    // running the normal conflict check on them would find their own session and
-    // false-positive as busy, since HasTherapistConflict doesn't exclude this slot.
-    var result = pool
-      .Select(t => new {
-        t.Id,
-        t.Name,
-        isCurrent = t.Id == slot.TherapistId,
-        available = t.Id == slot.TherapistId || IsTherapistFreeForSpan(t.Id, slot.Date, slot.TimeSlot, span)
-      })
+    const int halfDayBoundary = 52; // 13:00 - same AM/PM convention Vacation.AMPM uses
+    var isMorning = slot.TimeSlot < halfDayBoundary;
+    var clinicStart = GetClinicHoursStart();
+    var clinicEnd = GetClinicHoursEnd();
+    var halfStart = isMorning ? clinicStart : Math.Max(clinicStart, halfDayBoundary);
+    var halfEnd = isMorning ? Math.Min(clinicEnd, halfDayBoundary) : clinicEnd;
+
+    // CPU's call: show every active therapist, not just the category-matched
+    // pool, so a mismatched one still appears (grayed, with its own reason)
+    // instead of silently not being listed at all.
+    var allTherapists = _db.Therapists
+      .Where(t => t.IsActive == 1 && (t.OperatingArea & TherapistOperatingArea.Accettazione) == 0)
+      .OrderBy(t => t.Name)
       .ToList();
+
+    // status: "current" (assigned already, no button) | "green" (free at the
+    // exact same time - Riassegna) | "yellow" (not free right now, but has some
+    // other free moment this half-day - Ripianifica) | "red" (category mismatch,
+    // or genuinely nothing free all half-day).
+    var result = allTherapists.Select(t => {
+      if (t.Id == slot.TherapistId) {
+        return new { t.Id, t.Name, status = "current", reason = (string?)null };
+      }
+
+      // Same category-match rules as GetPalestraDropdownTherapists /
+      // GetRepartoCapableAndCoveringTherapists: pure-Reparto (2) is Reparto-only,
+      // everyone else (0/4/6) can do Palestra; Reparto needs the Reparto bit or
+      // the "aiuto" bit.
+      var isReparto = (t.OperatingArea & TherapistOperatingArea.Reparto) != 0;
+      var helpsOtherArea = (t.OperatingArea & TherapistOperatingArea.HelpsOtherArea) != 0;
+      var categoryMatches = type.Category == TherapyCategory.Palestra
+        ? t.OperatingArea != TherapistOperatingArea.Reparto
+        : isReparto || helpsOtherArea;
+
+      if (!categoryMatches) {
+        var mismatchReason = type.Category == TherapyCategory.Palestra ? "Non fa palestra" : "Non fa reparto";
+        return new { t.Id, t.Name, status = "red", reason = (string?)mismatchReason };
+      }
+
+      if (IsTherapistFreeForSpan(t.Id, slot.Date, slot.TimeSlot, span)) {
+        return new { t.Id, t.Name, status = "green", reason = (string?)null };
+      }
+
+      string blockedReason;
+      if (IsBlockedByVacation(t.Id, slot.Date, slot.TimeSlot, span)) {
+        blockedReason = "In vacanza";
+      } else if (!IsWithinAvailability(t.Id, slot.Date, slot.TimeSlot, span)) {
+        blockedReason = "Fuori orario normale di lavoro";
+      } else {
+        var conflictSlot = FindTherapistConflictSlot(t.Id, slot.Date, slot.TimeSlot, span);
+        var conflictPart = conflictSlot != null && partCache.ContainsKey(conflictSlot.TherapyPartId) ? partCache[conflictSlot.TherapyPartId] : null;
+        var conflictTherapy = conflictPart != null && therapyCache.ContainsKey(conflictPart.TherapyId) ? therapyCache[conflictPart.TherapyId] : null;
+        var conflictPatientName = conflictTherapy != null && patientCache.ContainsKey(conflictTherapy.PatientId)
+          ? patientCache[conflictTherapy.PatientId].Name
+          : "?";
+        blockedReason = "Impegnato con " + conflictPatientName;
+      }
+
+      // Strict hours only (no overtime margin) when looking for a fallback slot
+      // elsewhere in the half-day - CPU's call.
+      var hasOtherFreeSlot = false;
+      for (var s = halfStart; s + span <= halfEnd; s++) {
+        if (IsWithinDeclaredAvailability(t.Id, slot.Date, s, span)
+            && !IsBlockedByVacation(t.Id, slot.Date, s, span)
+            && !HasTherapistConflict(t.Id, slot.Date, s, span)) {
+          hasOtherFreeSlot = true;
+          break;
+        }
+      }
+
+      return new { t.Id, t.Name, status = hasOtherFreeSlot ? "yellow" : "red", reason = (string?)blockedReason };
+    }).ToList();
 
     return Ok(result);
   }
@@ -851,6 +912,159 @@ public partial class AppController {
 
     slot.TherapistId = request.TherapistId;
     _db.SaveChanges();
+
+    return Ok();
+  }
+
+  // Compact same-half-day (morning/afternoon, split at 13:00 - same AM/PM
+  // convention Vacation.AMPM already uses) schedule for a candidate therapist,
+  // shown when "Ripianifica" is picked - lets staff see what else that
+  // therapist has going on and choose a genuinely free spot (strict declared
+  // hours only, no overtime margin - CPU's call) to move this session into.
+  [HttpGet("/Giorno/Slot/{id}/TherapistHalfDayPreview")]
+  public IActionResult GiornoSlotTherapistHalfDayPreview(int id, int therapistId) {
+    if (!IsCurrentUserAccettazione()) {
+      return Forbid();
+    }
+
+    var slot = _db.TherapySlots.Find(id);
+
+    if (slot == null) {
+      return NotFound();
+    }
+
+    var therapist = _db.Therapists.Find(therapistId);
+
+    if (therapist == null) {
+      return NotFound();
+    }
+
+    var part = _db.TherapyParts.Find(slot.TherapyPartId);
+    var slotType = part != null ? _db.TherapyTypes.Find(part.TherapyTypeId) : null;
+
+    if (slotType == null) {
+      return NotFound();
+    }
+
+    var span = GetSpanSlots(slotType);
+
+    const int halfDayBoundary = 52; // 13:00
+    var isMorning = slot.TimeSlot < halfDayBoundary;
+    var clinicStart = GetClinicHoursStart();
+    var clinicEnd = GetClinicHoursEnd();
+    var rangeStart = isMorning ? clinicStart : Math.Max(clinicStart, halfDayBoundary);
+    var rangeEnd = isMorning ? Math.Min(clinicEnd, halfDayBoundary) : clinicEnd;
+
+    var partCache = GetPartCache();
+    var typeCache = GetTypeCache();
+    var therapyCache = GetTherapyCache();
+    var patientCache = GetPatientEntityCache();
+
+    var daySlots = _db.TherapySlots
+      .Where(s => s.TherapistId == therapistId && s.Date == slot.Date && s.Status != TherapySlotStatus.Rescheduled)
+      .ToList();
+
+    var items = daySlots.Select(s => {
+      var itemPart = partCache.ContainsKey(s.TherapyPartId) ? partCache[s.TherapyPartId] : null;
+      var itemType = itemPart != null && typeCache.ContainsKey(itemPart.TherapyTypeId) ? typeCache[itemPart.TherapyTypeId] : null;
+      var itemTherapy = itemPart != null && therapyCache.ContainsKey(itemPart.TherapyId) ? therapyCache[itemPart.TherapyId] : null;
+      var patientName = itemTherapy != null && patientCache.ContainsKey(itemTherapy.PatientId) ? patientCache[itemTherapy.PatientId].Name : "?";
+
+      return new {
+        slotId = s.Id,
+        timeSlot = s.TimeSlot,
+        durationSlots = itemType != null ? GetSpanSlots(itemType) : 1,
+        patientName,
+        therapyTypeLabel = itemType != null ? (string.IsNullOrEmpty(itemType.Abbreviazione) ? itemType.Name : itemType.Abbreviazione) : "?",
+        isOriginalSlot = s.Id == id
+      };
+    }).ToList();
+
+    // Free cells: within the therapist's STRICT declared hours (no overtime),
+    // not vacation-blocked, and not already covered by one of daySlots above -
+    // computed here rather than trusting raw availability windows alone.
+    var freeSlots = new List<int>();
+    for (var s = rangeStart; s + span <= rangeEnd; s++) {
+      if (IsWithinDeclaredAvailability(therapistId, slot.Date, s, span)
+          && !IsBlockedByVacation(therapistId, slot.Date, s, span)
+          && !HasTherapistConflict(therapistId, slot.Date, s, span)) {
+        freeSlots.Add(s);
+      }
+    }
+
+    return Ok(new {
+      rangeStart,
+      rangeEnd,
+      spanSlots = span,
+      freeSlots,
+      items
+    });
+  }
+
+  public class ReassignRequest {
+    public int TherapistId { get; set; }
+    public int TimeSlot { get; set; }
+  }
+
+  // Reassign a slot's therapist, and optionally its time (via the half-day
+  // preview above). No previous-slot history is kept anywhere - the same
+  // TherapySlot row is just updated in place (CPU's call: "it is not a
+  // rescheduled, it is reassigned"). If this changes BOTH the therapist and the
+  // time together, marks it important with Type=TherapistChangeNotification -
+  // the one alert type that only ever exists as a stored row (a same-time swap
+  // or a same-therapist move alone doesn't need the patient told).
+  [HttpPost("/Giorno/Slot/{id}/Reassign")]
+  public IActionResult GiornoSlotReassign(int id, [FromBody] ReassignRequest request) {
+    if (!IsCurrentUserAccettazione()) {
+      return Forbid();
+    }
+
+    var slot = _db.TherapySlots.Find(id);
+
+    if (slot == null) {
+      return NotFound();
+    }
+
+    var part = _db.TherapyParts.Find(slot.TherapyPartId);
+    var type = part != null ? _db.TherapyTypes.Find(part.TherapyTypeId) : null;
+
+    if (type == null || part == null) {
+      return NotFound();
+    }
+
+    var newTherapist = _db.Therapists.Find(request.TherapistId);
+
+    if (newTherapist == null) {
+      return NotFound();
+    }
+
+    var span = GetSpanSlots(type);
+
+    // Excludes the slot's own current booking, same reasoning as
+    // AvailableTherapists - reassigning a slot shouldn't false-positive against
+    // itself.
+    var conflictSlot = FindTherapistConflictSlot(request.TherapistId, slot.Date, request.TimeSlot, span);
+    if (conflictSlot != null && conflictSlot.Id != slot.Id) {
+      return BadRequest(new { message = "Il terapista ha già un impegno in quell'orario." });
+    }
+
+    var oldTherapistId = slot.TherapistId;
+    var oldTimeSlot = slot.TimeSlot;
+
+    slot.TherapistId = request.TherapistId;
+    slot.TimeSlot = request.TimeSlot;
+    _db.SaveChanges();
+
+    if (oldTherapistId.HasValue && oldTherapistId.Value != request.TherapistId && oldTimeSlot != request.TimeSlot) {
+      var key = ComputeAlertKey("therapistChangeNotification|" + slot.Id + "|" + DateTime.Now.Ticks);
+      _db.AlertMarkedImportants.Add(new AlertMarkedImportant {
+        Key = key,
+        MarkedAt = DateTime.Now,
+        Type = AlertType.TherapistChangeNotification,
+        SlotId = slot.Id
+      });
+      _db.SaveChanges();
+    }
 
     return Ok();
   }

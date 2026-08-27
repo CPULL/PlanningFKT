@@ -59,31 +59,31 @@ using (var scope = app.Services.CreateScope()) {
   }
 
   if (!db.Settings.Any(s => s.Key == "AvailabilityStart")) {
-    db.Settings.Add(new Setting { Key = "AvailabilityStart", Value = 28, ModDate = DateTime.Now, ModUser = 1 }); // 07:00
+    db.Settings.Add(new Setting { Key = "AvailabilityStart", Value = 28, Sorting = 10, ModDate = DateTime.Now, ModUser = 1 }); // 07:00
   }
 
   if (!db.Settings.Any(s => s.Key == "AvailabilityEnd")) {
-    db.Settings.Add(new Setting { Key = "AvailabilityEnd", Value = 76, ModDate = DateTime.Now, ModUser = 1 }); // 19:00
+    db.Settings.Add(new Setting { Key = "AvailabilityEnd", Value = 76, Sorting = 11, ModDate = DateTime.Now, ModUser = 1 }); // 19:00
   }
 
   if (!db.Settings.Any(s => s.Key == "RepartoTherapyStartingTime")) {
-    db.Settings.Add(new Setting { Key = "RepartoTherapyStartingTime", Value = 5, ModDate = DateTime.Now, ModUser = 1 });
+    db.Settings.Add(new Setting { Key = "RepartoTherapyStartingTime", Value = 5, Sorting = 20, ModDate = DateTime.Now, ModUser = 1 });
   }
 
   if (!db.Settings.Any(s => s.Key == "PalestraCoveringRepartoStartingTime")) {
-    db.Settings.Add(new Setting { Key = "PalestraCoveringRepartoStartingTime", Value = 5, ModDate = DateTime.Now, ModUser = 1 });
+    db.Settings.Add(new Setting { Key = "PalestraCoveringRepartoStartingTime", Value = 5, Sorting = 21, ModDate = DateTime.Now, ModUser = 1 });
   }
 
   if (!db.Settings.Any(s => s.Key == "RepartoCapacityWarningThreshold")) {
-    db.Settings.Add(new Setting { Key = "RepartoCapacityWarningThreshold", Value = 75, ModDate = DateTime.Now, ModUser = 1 });
+    db.Settings.Add(new Setting { Key = "RepartoCapacityWarningThreshold", Value = 75, Sorting = 30, ModDate = DateTime.Now, ModUser = 1 });
   }
 
   if (!db.Settings.Any(s => s.Key == "PacchettoScontoMinimo")) {
-    db.Settings.Add(new Setting { Key = "PacchettoScontoMinimo", Value = 5, ModDate = DateTime.Now, ModUser = 1 });
+    db.Settings.Add(new Setting { Key = "PacchettoScontoMinimo", Value = 5, Sorting = 40, ModDate = DateTime.Now, ModUser = 1 });
   }
 
   if (!db.Settings.Any(s => s.Key == "PacchettoScontoMassimo")) {
-    db.Settings.Add(new Setting { Key = "PacchettoScontoMassimo", Value = 25, ModDate = DateTime.Now, ModUser = 1 });
+    db.Settings.Add(new Setting { Key = "PacchettoScontoMassimo", Value = 25, Sorting = 41, ModDate = DateTime.Now, ModUser = 1 });
   }
 
 

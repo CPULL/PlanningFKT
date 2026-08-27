@@ -37,7 +37,9 @@ namespace minerva.planningfkt.Migrations
                 {
                     Key = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    MarkedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    MarkedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Type = table.Column<int>(type: "int", nullable: false),
+                    SlotId = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -78,6 +80,7 @@ namespace minerva.planningfkt.Migrations
                     Key = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Value = table.Column<int>(type: "int", nullable: false),
+                    Sorting = table.Column<int>(type: "int", nullable: false),
                     ModDate = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     ModUser = table.Column<int>(type: "int", nullable: false)
                 },

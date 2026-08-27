@@ -66,6 +66,26 @@ public partial class AppController {
     return availability.Any(a => timeSlot >= a.StartTime - margin && newEnd <= a.EndTime + margin);
   }
 
+  // Same as IsWithinAvailability but WITHOUT the overtime margin - CPU's call:
+  // fallback slots offered for reassignment must stay within a therapist's
+  // actual declared hours, even if they personally have overtime allowed.
+  private bool IsWithinDeclaredAvailability(int therapistId, DateOnly date, int timeSlot, int spanSlots) {
+    var dayOfWeek = (int)date.DayOfWeek;
+    var newEnd = timeSlot + spanSlots;
+
+    _availabilityByTherapistDayCache ??= new Dictionary<(int, int), List<TherapistAvailability>>();
+    var key = (therapistId, dayOfWeek);
+
+    if (!_availabilityByTherapistDayCache.TryGetValue(key, out var availability)) {
+      availability = _db.TherapistAvailabilities
+        .Where(a => a.TherapistId == therapistId && a.DayOfWeek == dayOfWeek)
+        .ToList();
+      _availabilityByTherapistDayCache[key] = availability;
+    }
+
+    return availability.Any(a => timeSlot >= a.StartTime && newEnd <= a.EndTime);
+  }
+
   // Mirrors the frontend's vacationCoverage split-at-13:00 logic, server-side.
   private bool IsBlockedByVacation(int therapistId, DateOnly date, int timeSlot, int spanSlots) {
     var noonSlot = 52; // 13:00 in 15-min slots from midnight
@@ -112,6 +132,12 @@ public partial class AppController {
   }
 
   private bool HasTherapistConflict(int therapistId, DateOnly date, int timeSlot, int spanSlots) {
+    return FindTherapistConflictSlot(therapistId, date, timeSlot, spanSlots) != null;
+  }
+
+  // Same overlap check as HasTherapistConflict, but returns the actual
+  // conflicting slot - needed to build a friendly "Impegnato con X" reason.
+  private TherapySlot? FindTherapistConflictSlot(int therapistId, DateOnly date, int timeSlot, int spanSlots) {
     var newEnd = timeSlot + spanSlots;
 
     var existingSlots = _db.TherapySlots
@@ -125,11 +151,11 @@ public partial class AppController {
       var existingEnd = slot.TimeSlot + existingSpan;
 
       if (timeSlot < existingEnd && newEnd > slot.TimeSlot) {
-        return true;
+        return slot;
       }
     }
 
-    return false;
+    return null;
   }
 
   private bool HasPatientConflict(int patientId, DateOnly date, int timeSlot, int spanSlots, int therapyTypeId) {

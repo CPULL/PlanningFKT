@@ -12,7 +12,7 @@ using minerva.planningfkt.models;
 namespace minerva.planningfkt.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260826120904_InitialCreate")]
+    [Migration("20260827105043_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -51,6 +51,12 @@ namespace minerva.planningfkt.Migrations
 
                     b.Property<DateTime>("MarkedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("SlotId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
 
                     b.HasKey("Key");
 
@@ -116,6 +122,9 @@ namespace minerva.planningfkt.Migrations
                         .HasColumnType("datetime(6)");
 
                     b.Property<int>("ModUser")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Sorting")
                         .HasColumnType("int");
 
                     b.Property<int>("Value")

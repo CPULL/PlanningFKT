@@ -5,6 +5,33 @@ using minerva.planningfkt.models;
 namespace minerva.planningfkt.controllers;
 
 public partial class AppController {
+  // Same convention as the frontend's formatPhoneDisplay: 3-digit lead group,
+  // then 2-digit groups, with the last group flexing to 3 digits so nothing is
+  // left dangling as a single digit.
+  private static string FormatPhoneDisplay(string? phone) {
+    if (string.IsNullOrEmpty(phone)) {
+      return "";
+    }
+
+    var digits = new string(phone.Where(char.IsDigit).ToArray());
+    if (digits.Length <= 3) {
+      return digits;
+    }
+
+    var groups = new List<string>();
+    var rest = digits.Substring(3);
+    var i = 0;
+
+    while (i < rest.Length) {
+      var remaining = rest.Length - i;
+      var take = remaining == 3 ? 3 : Math.Min(2, remaining);
+      groups.Add(rest.Substring(i, take));
+      i += take;
+    }
+
+    return digits.Substring(0, 3) + " " + string.Join(" ", groups);
+  }
+
   public class DismissAlertRequest {
     public string Key { get; set; } = string.Empty;
   }
@@ -43,8 +70,23 @@ public partial class AppController {
     return Ok();
   }
 
+  // Maps the plain string each computed alert card carries (alert.type in JS)
+  // onto the stored enum - only needed at the moment something is marked
+  // important, since that's the only time a type ever gets persisted.
+  private static readonly Dictionary<string, AlertType> AlertTypeByKey = new() {
+    ["therapyToBeScheduled"] = AlertType.TherapyToBeScheduled,
+    ["repeatedNoShow2"] = AlertType.RepeatedNoShow2,
+    ["repeatedNoShow3"] = AlertType.RepeatedNoShow3,
+    ["vacationConflict"] = AlertType.VacationConflict,
+    ["therapyRenewal"] = AlertType.TherapyRenewal,
+    ["therapistUnderScheduled"] = AlertType.TherapistUnderScheduled,
+    ["pastHolidayToUpdate"] = AlertType.PastHolidayToUpdate,
+    ["therapistChangeNotification"] = AlertType.TherapistChangeNotification
+  };
+
   public class MarkImportantAlertRequest {
     public string Key { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
   }
 
   [HttpPost("/Alerts/MarkImportant")]
@@ -57,8 +99,12 @@ public partial class AppController {
       return BadRequest();
     }
 
+    if (!AlertTypeByKey.TryGetValue(request.Type, out var alertType)) {
+      return BadRequest();
+    }
+
     if (!_db.AlertMarkedImportants.Any(m => m.Key == key)) {
-      _db.AlertMarkedImportants.Add(new AlertMarkedImportant { Key = key, MarkedAt = DateTime.Now });
+      _db.AlertMarkedImportants.Add(new AlertMarkedImportant { Key = key, MarkedAt = DateTime.Now, Type = alertType });
       _db.SaveChanges();
     }
 
@@ -525,6 +571,59 @@ public partial class AppController {
         detail = "La festività '" + (holiday.Name ?? "?") + "' (" + dateLabel + ") è passata e va aggiornata per l'anno prossimo.",
         targetView = "assenze",
         targetId = (int?)holiday.Id,
+        targetTherapistId = (int?)null,
+        targetDate = (string?)null
+      }));
+    }
+
+    // TherapistChangeNotification is the one alert type with no "computed" form
+    // at all - it only ever exists as a row here, created directly by
+    // Giorno/Slot/{id}/Reassign when a reassignment changes both therapist and
+    // time together. No history of the previous therapist/time is kept (CPU's
+    // call), so the card only describes the current assignment. Adding it
+    // through the same (key, data) list as everything else means the split
+    // below routes it into importantAlerts automatically, since its own Key is
+    // - by definition - already present in AlertMarkedImportant.
+    var changeNotificationRows = _db.AlertMarkedImportants
+      .AsNoTracking()
+      .Where(m => m.Type == AlertType.TherapistChangeNotification && m.SlotId.HasValue)
+      .ToList();
+
+    foreach (var row in changeNotificationRows) {
+      var changeSlot = _db.TherapySlots.Find(row.SlotId!.Value);
+      if (changeSlot == null) {
+        continue;
+      }
+
+      var changePart = partCache.ContainsKey(changeSlot.TherapyPartId) ? partCache[changeSlot.TherapyPartId] : null;
+      var changeTherapy = changePart != null && therapyCache.ContainsKey(changePart.TherapyId) ? therapyCache[changePart.TherapyId] : null;
+      if (changeTherapy == null) {
+        continue;
+      }
+
+      var changePatientName = patientNames.ContainsKey(changeTherapy.PatientId) ? patientNames[changeTherapy.PatientId] : "?";
+      var changePatientPhone = patients.ContainsKey(changeTherapy.PatientId) ? FormatPhoneDisplay(patients[changeTherapy.PatientId].Phone) : "?";
+      var changeTherapistName = changeSlot.TherapistId.HasValue && therapistCache.ContainsKey(changeSlot.TherapistId.Value)
+        ? therapistCache[changeSlot.TherapistId.Value].Name
+        : "?";
+      var changeTimeLabel = (changeSlot.TimeSlot / 4).ToString("D2") + ":" + ((changeSlot.TimeSlot % 4) * 15).ToString("D2");
+      string[] italianDayNames = { "Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato" };
+      var changeDayName = italianDayNames[(int)changeSlot.Date.DayOfWeek];
+      var changeDateLabel = changeSlot.Date.ToString("dd/MM") + " alle ore " + changeTimeLabel;
+
+      alerts.Add((row.Key, new {
+        type = "therapistChangeNotification",
+        title = "Avvisare paziente di cambio terapista/orario",
+        icon = "📣",
+        color = "#D35400",
+        dismissKey = row.Key.ToString(),
+        line1 = changePatientName,
+        line2 = changeTherapistName + " - " + changeDayName + " " + changeSlot.Date.ToString("dd/MM"),
+        detail = changeTherapistName + " è il nuovo terapista per " + changePatientName + "\n" +
+                 "La terapia è spostata al " + changeDayName + " " + changeDateLabel + "\n" +
+                 "Avvisare del cambio: " + changePatientPhone,
+        targetView = "pazienti",
+        targetId = (int?)changeTherapy.PatientId,
         targetTherapistId = (int?)null,
         targetDate = (string?)null
       }));

@@ -29,7 +29,11 @@ public partial class AppController {
     // Deliberately reads straight from the DB, not the SettingsCache: this admin list
     // needs full row metadata (Id, ModDate, ModUser) that the cache doesn't carry, and
     // it's a low-frequency page, not part of the Giorno/Settimana hot path.
-    var rows = _db.Settings.OrderBy(s => s.Key).ToList();
+    // Ordered by the Setting's own Sorting column (CPU's own seed data assigns
+    // these) rather than key name - alphabetical sorting used to put
+    // "AvailabilityEnd" above "AvailabilityStart", making it easy to set the end
+    // before the start by mistake.
+    var rows = _db.Settings.OrderBy(s => s.Sorting).ToList();
 
     var modifierNames = includeAudit
       ? _db.Therapists.ToDictionary(t => t.Id, t => t.Name)

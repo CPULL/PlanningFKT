@@ -592,7 +592,22 @@ $(function() {
     ensureAvailabilityRange(function(range) {
       var $popup = $('<div class="time-picker-popup"></div>');
 
-      for (var slot = range.start; slot <= range.end; slot++) {
+      var rangeStart = range.start;
+      var rangeEnd = range.end;
+
+      if (rangeStart >= rangeEnd) {
+        // The underlying AvailabilityStart/End settings are inverted - this
+        // broken range is shared by EVERY time-picker in the app (not just the
+        // one editing these settings), so falling back to just a few slots
+        // around the current value made every picker across the app unusable.
+        // Fall back to the full day instead, so it stays properly scrollable
+        // no matter which picker this is, until the settings themselves get
+        // fixed.
+        rangeStart = 0;
+        rangeEnd = 95;
+      }
+
+      for (var slot = rangeStart; slot <= rangeEnd; slot++) {
         (function(slot) {
           var $row = $('<div class="time-picker-row"></div>').text(slotToTime(slot));
 
@@ -2145,41 +2160,149 @@ $(function() {
     ]);
   }
 
-  // Sub-popup for "Cambia terapista" - shows the same therapy details as the detail
-  // popup, then the therapist pool appropriate to the slot's category (Palestra vs
-  // Reparto), marking each as available/busy for that exact date+timeslot
-  // (Giorno/Slot/{id}/AvailableTherapists already excludes the conflict
-  // false-positive against the slot's own current therapist).
+
+  // Sub-popup for "Cambia terapista": every active therapist is shown as plain
+  // text (icon + name + reason, never clickable itself) - the action is a
+  // separate button aligned on the right:
+  // - green check, "(attuale)" for the currently assigned one - no button.
+  // - green check + "Riassegna" - free at the exact same time.
+  // - yellow question mark + reason + "Ripianifica" - not free right now, but
+  //   has some other free moment this same half-day (strict hours only).
+  // - red cross + reason, no button - category mismatch or genuinely nothing
+  //   free all half-day.
   function showChangeTherapistPopup(detail) {
     $.get('Giorno/Slot/' + detail.id + '/AvailableTherapists').done(function(therapists) {
-      var itemsHtml = therapists.map(function(t) {
-        var disabledClass = t.available ? '' : ' change-therapist-unavailable';
-        var currentTag = t.isCurrent ? ' (attuale)' : '';
-        return '<li class="change-therapist-line' + disabledClass + '" data-therapist-id="' + t.id + '" data-available="' + t.available + '">' +
-          t.name + currentTag + '</li>';
-      }).join('');
+      var $body = $('<div></div>');
+      $body.append('<h3>Scegli un nuovo terapista per l\'attività</h3>');
+      $body.append(buildSlotDetailBandHtml(detail));
 
-      var bodyHtml = '<h3>Scegli un nuovo terapista per l\'attività</h3>' +
-        buildSlotDetailBandHtml(detail) +
-        '<ul class="change-therapist-list">' + itemsHtml + '</ul>';
+      var $columns = $('<div class="change-therapist-columns"></div>');
+      var $list = $('<div class="change-therapist-grid"></div>');
+      var $sidePanel = $('<div class="change-therapist-side-panel"></div>');
+      $columns.append($list).append($sidePanel);
+      $body.append($columns);
 
-      window.showModal(
-        bodyHtml,
-        [{ label: 'Annulla', className: 'secondary', onClick: function() { showSlotDetailPopup(detail.id); } }]
-      );
+      var iconByStatus = { current: '✔', green: '✔', yellow: '❓', red: '✖' };
+      var iconClassByStatus = { current: 'change-therapist-icon-green', green: 'change-therapist-icon-green', yellow: 'change-therapist-icon-yellow', red: 'change-therapist-icon-red' };
 
-      $('#modal-body .change-therapist-line[data-available="true"]').on('click', function() {
-        var therapistId = $(this).data('therapist-id');
-
+      function doReassign(therapistId, timeSlot) {
         $.ajax({
-          url: 'Giorno/Slot/' + detail.id + '/ChangeTherapist',
+          url: 'Giorno/Slot/' + detail.id + '/Reassign',
           method: 'POST',
           contentType: 'application/json',
-          data: JSON.stringify({ therapistId: therapistId })
+          data: JSON.stringify({ therapistId: therapistId, timeSlot: timeSlot })
         }).done(function() {
+          $('#modal-overlay').hide();
           refreshGiornoSettimanaView();
+        }).fail(function(jqXHR) {
+          var msg = (jqXHR.responseJSON && jqXHR.responseJSON.message) ? jqXHR.responseJSON.message : 'Riassegnazione non riuscita.';
+          window.showModal('<p>' + msg + '</p>', [{ label: 'Chiudi', className: 'secondary', onClick: function() {} }]);
         });
+      }
+
+      function confirmReassign(therapistId, therapistName, timeSlot) {
+        var sameTime = timeSlot === detail.timeSlot;
+        var message = sameTime
+          ? 'Sicuro di riassegnare la seduta di ' + detail.patientName + ' a ' + therapistName + ' allo stesso orario?'
+          : 'Sicuro di riassegnare la seduta di ' + detail.patientName + ' a ' + therapistName + ' per le ' + slotToTime(timeSlot) + '?';
+
+        window.showModal('<p>' + message + '</p>', [
+          { label: 'Sì', className: '', onClick: function() { doReassign(therapistId, timeSlot); } },
+          { label: 'No', className: 'secondary', onClick: function() { showChangeTherapistPopup(detail); } }
+        ]);
+      }
+
+      therapists.forEach(function(t) {
+        var $row = $('<div class="change-therapist-row"></div>');
+        var $icon = $('<span class="change-therapist-icon"></span>').addClass(iconClassByStatus[t.status]).text(iconByStatus[t.status]);
+        var label = t.name + (t.status === 'current' ? ' (attuale)' : '') + (t.reason ? ' - ' + t.reason : '');
+        var $label = $('<span class="change-therapist-label"></span>').text(label);
+
+        $row.append($icon).append($label);
+
+        var $actionCell = $('<span class="change-therapist-action"></span>');
+
+        if (t.status === 'green') {
+          var $riassegnaBtn = $('<button type="button" class="secondary">Riassegna</button>');
+          $riassegnaBtn.on('click', function() {
+            confirmReassign(t.id, t.name, detail.timeSlot);
+          });
+          $actionCell.append($riassegnaBtn);
+        } else if (t.status === 'yellow') {
+          var $ripianificaBtn = $('<button type="button" class="secondary">Ripianifica</button>');
+          $ripianificaBtn.on('click', function() {
+            showRipianificaSidePanel($sidePanel, detail, t, function(timeSlot) {
+              confirmReassign(t.id, t.name, timeSlot);
+            });
+          });
+          $actionCell.append($ripianificaBtn);
+        }
+
+        $row.append($actionCell);
+        $list.append($row);
       });
+
+      window.showModal('', [{ label: 'Annulla', className: 'secondary', onClick: function() { showSlotDetailPopup(detail.id); } }]);
+      $('#modal-body').empty().append($body);
+    });
+  }
+
+  // Docked mini-day-view for "Ripianifica" - shown inside the same popup, to the
+  // right of the therapist list, rather than as a hover tooltip. Only slots
+  // within the therapist's strict declared hours are offered (never extended by
+  // overtime, even if they personally have it - CPU's call).
+  function showRipianificaSidePanel($sidePanel, detail, therapist, onPickSlot) {
+    $sidePanel.empty();
+
+    $.get('Giorno/Slot/' + detail.id + '/TherapistHalfDayPreview', { therapistId: therapist.id }).done(function(data) {
+      var $panel = $('<div class="therapist-halfday-preview-docked"></div>');
+      $panel.append($('<div class="therapist-halfday-preview-title"></div>').text(therapist.name));
+
+      var itemsByStart = {};
+      var occupiedSlots = {};
+      data.items.forEach(function(item) {
+        itemsByStart[item.timeSlot] = item;
+        for (var s = item.timeSlot; s < item.timeSlot + item.durationSlots; s++) {
+          occupiedSlots[s] = true;
+        }
+      });
+
+      var freeSet = {};
+      (data.freeSlots || []).forEach(function(s) { freeSet[s] = true; });
+
+      for (var slot = data.rangeStart; slot < data.rangeEnd; slot++) {
+        if (itemsByStart[slot]) {
+          var item = itemsByStart[slot];
+          var $row = $('<div class="therapist-halfday-row therapist-halfday-row-busy"></div>')
+            .css('height', (item.durationSlots * 14) + 'px')
+            .text(slotToTime(slot) + ' ' + item.patientName + ' - ' + item.therapyTypeLabel);
+          if (item.isOriginalSlot) {
+            $row.addClass('therapist-halfday-row-original');
+          }
+          $panel.append($row);
+          slot += item.durationSlots - 1;
+        } else if (occupiedSlots[slot]) {
+          slot++; // covered by a multi-slot item starting earlier, already rendered
+        } else if (freeSet[slot]) {
+          (function(targetSlot) {
+            var $freeRow = $('<div class="therapist-halfday-row therapist-halfday-row-free"></div>')
+              .css('height', '14px')
+              .text(slotToTime(targetSlot));
+            $freeRow.on('click', function() {
+              onPickSlot(targetSlot);
+            });
+            $panel.append($freeRow);
+          })(slot);
+        } else {
+          $panel.append(
+            $('<div class="therapist-halfday-row therapist-halfday-row-outside"></div>')
+              .css('height', '14px')
+              .text(slotToTime(slot))
+          );
+        }
+      }
+
+      $sidePanel.append($panel);
     });
   }
 
@@ -2991,7 +3114,7 @@ $(function() {
       var $importantBtn = $('<button type="button" class="alert-card-go-btn secondary">Importante!</button>');
       $importantBtn.on('click', function(e) {
         e.stopPropagation();
-        $.ajax({ url: 'Alerts/MarkImportant', method: 'POST', contentType: 'application/json', data: JSON.stringify({ key: alert.dismissKey }) })
+        $.ajax({ url: 'Alerts/MarkImportant', method: 'POST', contentType: 'application/json', data: JSON.stringify({ key: alert.dismissKey, type: alert.type }) })
           .done(function() { renderAvvisiList(); });
       });
       $actions.append($importantBtn);
@@ -3074,7 +3197,13 @@ $(function() {
       $p.append(alertJumpBtn(alert.line1, 'assenze', alert.targetId));
       $p.append(' è passata e va aggiornata per l\'anno prossimo.');
     } else {
-      $p.text(alert.detail);
+      var lines = alert.detail.split('\n');
+      lines.forEach(function(line, i) {
+        if (i > 0) {
+          $p.append('<br>');
+        }
+        $p.append(document.createTextNode(line));
+      });
     }
 
     return $p;

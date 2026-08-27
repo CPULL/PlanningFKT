@@ -10,8 +10,10 @@ public class Setting {
   public string Key { get; set; } = string.Empty;
 
   public int Value { get; set; }
+	public int Sorting { get; set; }
 
-  public DateTime ModDate { get; set; }
+
+	public DateTime ModDate { get; set; }
 
   public int ModUser { get; set; }
 }
