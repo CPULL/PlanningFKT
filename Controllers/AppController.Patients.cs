@@ -111,13 +111,28 @@ public partial class AppController {
     });
   }
 
+  // A therapy whose sessions are all done (Status == Completed) still needs to
+  // stay "current" on the patient page until its Foglio Firma work is ALSO fully
+  // wrapped up - otherwise the row needed to advance it would disappear the
+  // moment the last session is marked Done. Meaningless for Privata (Foglio
+  // Firma never applies there), so those are "fully done" as soon as Status is.
+  private static bool IsTherapyFullyDone(Therapy t) {
+    if (t.Status != TherapyStatus.Completed) {
+      return false;
+    }
+    return t.BillingCategory == TherapyBillingCategory.Privata || t.FoglioFirmaStatus == FoglioFirmaStatus.Completed;
+  }
+
   // "Current" = not yet Completed/Cancelled. Only one such Therapy can exist per
   // patient at a time (enforced on Create), so the most recent one is unambiguous.
   private object? GetCurrentTherapyInfo(int patientId) {
-    var therapy = _db.Therapies
-      .Where(t => t.PatientId == patientId && t.Status != TherapyStatus.Completed && t.Status != TherapyStatus.Cancelled)
+    var candidates = _db.Therapies
+      .Where(t => t.PatientId == patientId && t.Status != TherapyStatus.Cancelled)
       .OrderByDescending(t => t.Id)
-      .FirstOrDefault();
+      .ToList();
+
+    var therapy = candidates.FirstOrDefault(t => t.Status != TherapyStatus.Completed)
+      ?? candidates.FirstOrDefault(t => !IsTherapyFullyDone(t));
 
     if (therapy == null) {
       return null;
@@ -153,6 +168,13 @@ public partial class AppController {
       therapy.Name,
       therapy.Status,
       statusLabel = TherapyStatus.ToLabel(therapy.Status),
+      therapy.BillingCategory,
+      billingCategoryLabel = TherapyBillingCategory.ToLabel(therapy.BillingCategory),
+      isPrivate = therapy.BillingCategory == TherapyBillingCategory.Privata,
+      therapy.FoglioFirmaStatus,
+      foglioFirmaStatusLabel = FoglioFirmaStatus.ToLabel(therapy.FoglioFirmaStatus),
+      canAdvanceFoglioFirma = therapy.FoglioFirmaStatus == FoglioFirmaStatus.ToBeCreated
+        || therapy.FoglioFirmaStatus == FoglioFirmaStatus.ToBeFinalized,
       parts
     };
   }

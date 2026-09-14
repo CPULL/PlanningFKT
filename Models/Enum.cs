@@ -91,6 +91,47 @@ public static class VacationPeriod {
   public const int PM = 1;
 }
 
+// Therapy.BillingCategory - set at creation, never changes. Only Privata is ever
+// treated differently anywhere in the app (Convenzione and Assicurazione behave
+// identically - CPU's call) - kept as three named values rather than a bool
+// because the office still needs to know which of the two non-private kinds a
+// therapy is, even though the app itself doesn't branch on it.
+public static class TherapyBillingCategory {
+  public const int Convenzione = 0;
+  public const int Privata = 1;
+  public const int Assicurazione = 2;
+
+  public static string ToLabel(int category) {
+    switch (category) {
+      case Convenzione: return "Terapia in Convenzione";
+      case Privata: return "Terapia privata";
+      case Assicurazione: return "Terapia con assicurazione/INAIL";
+      default: return "Sconosciuto";
+    }
+  }
+}
+
+// Therapy.FoglioFirmaStatus - tracks the sign-in sheet(s) for a therapy as one
+// group (CPU's call: they're always handled together, no need to count how many
+// there are). Meaningless for Privata therapies - the app just never shows this
+// row for those, rather than adding a "NotNeeded" value that would never apply.
+public static class FoglioFirmaStatus {
+  public const int ToBeCreated = 0;
+  public const int InProgress = 1;
+  public const int ToBeFinalized = 2;
+  public const int Completed = 3;
+
+  public static string ToLabel(int status) {
+    switch (status) {
+      case ToBeCreated: return "Foglio Firma da creare";
+      case InProgress: return "In uso";
+      case ToBeFinalized: return "Foglio Firma da chiudere";
+      case Completed: return "Foglio Firma gestito";
+      default: return "Sconosciuto";
+    }
+  }
+}
+
 // Every alert type Alerts/List can produce. Most are pure software - computed
 // fresh each request, never stored. Stored only when an alert is marked
 // "Importante!" (AlertMarkedImportant.Type) - kept mainly so we know which kind

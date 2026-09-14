@@ -240,6 +240,12 @@ namespace minerva.planningfkt.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("BillingCategory")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FoglioFirmaStatus")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("ModDate")
                         .HasColumnType("datetime(6)");
 

@@ -12,6 +12,7 @@ public partial class AppController {
   public class TherapySaveRequest {
     public int PatientId { get; set; }
     public string? Name { get; set; }
+    public int BillingCategory { get; set; }
     public List<TherapyPartRequest> Parts { get; set; } = new();
   }
 
@@ -65,6 +66,8 @@ public partial class AppController {
       Name = request.Name,
       Status = TherapyStatus.ToBeScheduled,
       PatientId = request.PatientId,
+      BillingCategory = request.BillingCategory,
+      FoglioFirmaStatus = FoglioFirmaStatus.ToBeCreated,
       ModDate = DateTime.Now,
       ModUser = currentUserId.Value
     };
@@ -137,6 +140,54 @@ public partial class AppController {
     _db.SaveChanges();
 
     return Ok();
+  }
+
+  // Advances FoglioFirmaStatus one manual step: ToBeCreated->InProgress ("Foglio
+  // Firma creato") is always allowed; ToBeFinalized->Completed ("Foglio Firma
+  // Chiuso") too. InProgress->ToBeFinalized has NO manual step at all - it
+  // happens automatically the instant the therapy itself completes (see
+  // RecomputeTherapyCompletion) - CPU's call. Never applies to Privata
+  // therapies, which jump straight to Completed when the therapy does.
+  [HttpPost("/Therapies/{id}/AdvanceFoglioFirma")]
+  public IActionResult TherapiesAdvanceFoglioFirma(int id) {
+    if (!IsCurrentUserAccettazione()) {
+      return Forbid();
+    }
+
+    var currentUserId = GetCurrentTherapistId();
+
+    if (currentUserId == null) {
+      return Unauthorized();
+    }
+
+    var therapy = _db.Therapies.Find(id);
+
+    if (therapy == null) {
+      return NotFound();
+    }
+
+    if (therapy.BillingCategory == TherapyBillingCategory.Privata) {
+      return BadRequest(new { message = "Il Foglio Firma non si applica alle terapie private." });
+    }
+
+    int nextStatus;
+    if (therapy.FoglioFirmaStatus == FoglioFirmaStatus.ToBeCreated) {
+      nextStatus = FoglioFirmaStatus.InProgress;
+    } else if (therapy.FoglioFirmaStatus == FoglioFirmaStatus.ToBeFinalized) {
+      nextStatus = FoglioFirmaStatus.Completed;
+    } else {
+      return BadRequest(new { message = "Nessuna azione manuale disponibile per questo stato." });
+    }
+
+    therapy.FoglioFirmaStatus = nextStatus;
+    therapy.ModDate = DateTime.Now;
+    therapy.ModUser = currentUserId.Value;
+    _db.SaveChanges();
+
+    return Ok(new {
+      foglioFirmaStatus = therapy.FoglioFirmaStatus,
+      foglioFirmaStatusLabel = FoglioFirmaStatus.ToLabel(therapy.FoglioFirmaStatus)
+    });
   }
 
   [HttpPost("/Therapies/Remove/{id}")]

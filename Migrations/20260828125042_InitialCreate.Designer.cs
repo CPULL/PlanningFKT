@@ -12,7 +12,7 @@ using minerva.planningfkt.models;
 namespace minerva.planningfkt.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260827105043_InitialCreate")]
+    [Migration("20260828125042_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -242,6 +242,12 @@ namespace minerva.planningfkt.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BillingCategory")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FoglioFirmaStatus")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("ModDate")
                         .HasColumnType("datetime(6)");

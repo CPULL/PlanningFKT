@@ -140,7 +140,8 @@ $(function() {
     terapie: 'Terapie',
     impostazioni: 'Impostazioni',
     pacchetti: 'Pacchetti',
-    gestisciAssenza: 'Gestisci assenza'
+    gestisciAssenza: 'Gestisci assenza',
+    fogliFirma: 'Fogli firma per domani'
   };
 
   // Impostazioni: user-readable labels for known Setting keys, falling back to the raw
@@ -995,6 +996,8 @@ $(function() {
       renderPacchettoTariffarioPage();
     } else if (view === 'gestisciAssenza') {
       renderGestisciAssenzaView();
+    } else if (view === 'fogliFirma') {
+      renderFogliFirmaView();
     } else {
       $('#content').text('Vista: ' + view + ' (non ancora implementata)');
     }
@@ -1131,6 +1134,8 @@ $(function() {
       callback();
       return;
     }
+
+    $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
 
     $.get('Users/TherapistsForScheduling').done(function(list) {
       schedulingTherapists = list;
@@ -1616,6 +1621,71 @@ $(function() {
 
     $table.append($tbody);
     return $table;
+  }
+
+  // "Fogli firma per domani" - three independent, compact 3-column grids
+  // (CPU's call: up to ~200 rows/day, a single wide table isn't usable at that
+  // volume). List 1 is the roster for the next working day; lists 2/3 are
+  // global (not tied to tomorrow), each windowed to a month back / a week
+  // forward around today so old or far-future therapies don't clutter them.
+  function renderFogliFirmaView() {
+    setTopbarActions(null);
+    $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
+
+    $.get('FogliFirma/Domani').done(function(result) {
+      var $wrapper = $('<div></div>');
+      var dateObj = parseDateISO(result.date);
+
+      function buildRosterCell(p) {
+        var $cell = $('<div class="foglio-firma-cell"></div>');
+        $cell.append($('<div class="foglio-firma-cell-name"></div>').text(p.patientName));
+
+        var $therapiesDiv = $('<div class="foglio-firma-cell-therapies"></div>').text(p.therapies);
+
+        if (p.isFirstSession || p.isLastSession) {
+          var $badges = $('<div class="foglio-firma-badges"></div>');
+          if (p.isFirstSession) {
+            $badges.append('<span class="foglio-firma-badge foglio-firma-badge-first">Prima seduta</span>');
+          }
+          if (p.isLastSession) {
+            $badges.append('<span class="foglio-firma-badge foglio-firma-badge-last">Ultima seduta</span>');
+          }
+          $therapiesDiv.append($badges);
+        }
+
+        $cell.append($therapiesDiv);
+        $cell.on('click', function() { navigateTo('pazienti', p.patientId); });
+        return $cell;
+      }
+
+      function buildTherapyCell(t) {
+        var $cell = $('<div class="foglio-firma-cell"></div>');
+        $cell.append($('<div class="foglio-firma-cell-name"></div>').text(t.patientName));
+        $cell.append($('<div class="foglio-firma-cell-therapies"></div>').text(t.therapies));
+        $cell.append($('<div class="foglio-firma-cell-date"></div>').text(t.relevantDate));
+        $cell.on('click', function() { navigateTo('pazienti', t.patientId); });
+        return $cell;
+      }
+
+      function buildSection(title, items, buildCell) {
+        $wrapper.append($('<h3></h3>').text(title));
+        if (items.length === 0) {
+          $wrapper.append('<div class="scheduling-empty">Nessuno.</div>');
+          return;
+        }
+        var $grid = $('<div class="foglio-firma-grid"></div>');
+        items.forEach(function(item) {
+          $grid.append(buildCell(item));
+        });
+        $wrapper.append($grid);
+      }
+
+      buildSection('Fogli firma per ' + formatGiornoLabel(dateObj), result.patients, buildRosterCell);
+      buildSection('Foglio Firma da preparare', result.toBeCreated, buildTherapyCell);
+      buildSection('Foglio Firma da chiudere', result.toBeFinalized, buildTherapyCell);
+
+      $('#content').empty().append($wrapper);
+    });
   }
 
   // "Gestisci assenza" - urgent same-day tool: pick the therapist who called in,
@@ -5683,6 +5753,43 @@ $(function() {
             });
             $summary.append($partsList);
             $therapyDisplay.append($summary);
+
+            if (!therapy.isPrivate) {
+              var $foglioFirmaRow = $('<div class="therapy-foglio-firma-row"></div>');
+              var $foglioFirmaLabel = $('<span class="therapy-foglio-firma-label"></span>');
+              $foglioFirmaLabel.append('<strong>Foglio Firma:</strong> ').append(document.createTextNode(therapy.foglioFirmaStatusLabel));
+              $foglioFirmaRow.append($foglioFirmaLabel);
+
+              // InProgress -> ToBeFinalized has no button - it happens
+              // automatically the moment the therapy itself completes (CPU's
+              // call). Only the other two steps are manual.
+              var advanceLabel = null;
+              if (therapy.foglioFirmaStatus === 0) { // ToBeCreated
+                advanceLabel = 'Il Foglio Firma è stato creato';
+              } else if (therapy.foglioFirmaStatus === 2) { // ToBeFinalized
+                advanceLabel = 'Il Foglio Firma è stato chiuso';
+              }
+
+              if (advanceLabel) {
+                var $advanceBtn = $('<button type="button"></button>').text(advanceLabel);
+                $advanceBtn.on('click', function() {
+                  $.ajax({ url: 'Therapies/' + therapy.id + '/AdvanceFoglioFirma', method: 'POST' })
+                    .done(function() {
+                      $.get('Patients/Get/' + id).done(function(freshData) {
+                        data = freshData;
+                        renderTherapyDisplay();
+                      });
+                    })
+                    .fail(function(jqXHR) {
+                      var msg = (jqXHR.responseJSON && jqXHR.responseJSON.message) ? jqXHR.responseJSON.message : 'Operazione non riuscita.';
+                      window.showModal('<p>' + msg + '</p>', [{ label: 'Chiudi', className: 'secondary', onClick: function() {} }]);
+                    });
+                });
+                $foglioFirmaRow.append($advanceBtn);
+              }
+
+              $therapyDisplay.append($foglioFirmaRow);
+            }
           }
 
           var $buttonsRow = $('<div class="therapy-buttons-row"></div>');
@@ -5770,6 +5877,22 @@ $(function() {
             var $therapyNameInput = $('<input type="text" class="therapy-name-input">').val(therapy ? (therapy.name || '') : '');
             $therapyFormArea.append($therapyNameInput);
 
+            // Fixed at creation (CPU's call) - editable only when creating a new
+            // therapy, shown read-only when editing an existing one.
+            $therapyFormArea.append('<label>Tipo</label>');
+            var billingCategoryLabels = ['Terapia in Convenzione', 'Terapia privata', 'Terapia con assicurazione/INAIL'];
+            var $billingCategorySelect = null;
+
+            if (therapy) {
+              $therapyFormArea.append($('<div></div>').text(billingCategoryLabels[therapy.billingCategory]));
+            } else {
+              $billingCategorySelect = $('<select class="therapy-billing-category"></select>');
+              billingCategoryLabels.forEach(function(label, i) {
+                $billingCategorySelect.append('<option value="' + i + '">' + label + '</option>');
+              });
+              $therapyFormArea.append($billingCategorySelect);
+            }
+
             var $partsContainer = $('<div class="therapy-parts-editor"></div>');
             $therapyFormArea.append($partsContainer);
 
@@ -5812,16 +5935,13 @@ $(function() {
 
             $therapyFormArea.append('<div class="form-error therapy-error"></div>');
 
-            var $therapyActionsRow = $('<div class="therapy-actions-row"></div>');
-            var $therapyCancelBtn = $('<button type="button" class="secondary">Annulla</button>');
-
-            $therapyCancelBtn.on('click', function() {
-              renderTherapyDisplay();
-            });
-
             // Called from the page's single Salva button when this sub-form is open -
             // returns the payload if valid, or shows the inline error and returns null.
             // No separate "Salva terapia" button anymore (CPU: merge into one Save).
+            // No separate "Annulla" for this sub-form either - the page-level
+            // Cancella already discards any unsaved changes, including an open
+            // therapy sub-form, since navigating away doesn't persist anything
+            // (CPU: the two cancel buttons were confusing).
             getTherapyPayloadIfValid = function() {
               var parts = [];
               var valid = true;
@@ -5847,13 +5967,11 @@ $(function() {
               return {
                 patientId: id,
                 name: $therapyNameInput.val(),
+                billingCategory: therapy ? therapy.billingCategory : parseInt($billingCategorySelect.val(), 10),
                 parts: parts,
                 existingTherapyId: therapy ? therapy.id : null
               };
             };
-
-            $therapyActionsRow.append($therapyCancelBtn);
-            $therapyFormArea.append($therapyActionsRow);
           });
         }
 
@@ -6074,6 +6192,8 @@ $(function() {
   // --- Utenti -------------------------------------------------------------
 
   function renderUtentiList() {
+    $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
+
     $.get('Users/List', { includeRemoved: showRemoved, includeAudit: showAudit })
       .done(function(users) {
         var $newButton = $('<button type="button">Nuovo utente</button>');
@@ -6468,6 +6588,8 @@ $(function() {
   // --- Terapie (TherapyTypes) ----------------------------------------------
 
   function renderTerapieList() {
+    $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
+
     $.get('TherapyTypes/List', { includeRemoved: showRemoved, includeAudit: showAudit })
       .done(function(types) {
         var $newButton = $('<button type="button">Nuova terapia</button>');
@@ -6733,6 +6855,8 @@ $(function() {
   }
 
   function renderAssenzeList() {
+    $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
+
     $.get('Vacations/List').done(function(rows) {
       var $newButton = $('<button type="button">Crea assenza</button>');
       $newButton.on('click', function() {
@@ -7113,6 +7237,8 @@ $(function() {
   }
 
   function renderImpostazioniList() {
+    $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
+
     $.get('Settings/List', { includeAudit: showAudit })
       .done(function(settings) {
         var $wrapper = $('<div></div>');
@@ -7237,6 +7363,8 @@ $(function() {
   // --- Pacchetti (commercial packages, patient-linked or generic) ------------
 
   function renderPacchettiList() {
+    $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
+
     $.get('Pacchetti/List', { includeAudit: showAudit }).done(function(rows) {
       var $newButton = $('<button type="button">Aggiungi</button>');
       $newButton.on('click', function() {

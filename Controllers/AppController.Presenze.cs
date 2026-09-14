@@ -181,6 +181,7 @@ public partial class AppController {
     slot.ModUser = GetCurrentTherapistId();
 
     _db.SaveChanges();
+    RecomputeTherapyCompletion(slot.TherapyPartId);
 
     var therapistNameCache = GetTherapistNameCache();
 

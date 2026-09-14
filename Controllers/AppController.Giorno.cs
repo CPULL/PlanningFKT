@@ -1124,6 +1124,7 @@ public partial class AppController {
 
     slot.Status = request.Status;
     _db.SaveChanges();
+    RecomputeTherapyCompletion(slot.TherapyPartId);
 
     return Ok();
   }

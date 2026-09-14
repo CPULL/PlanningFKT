@@ -600,7 +600,8 @@ body {
 }
 
 .therapy-buttons-row button,
-.therapy-actions-row button {
+.therapy-actions-row button,
+.therapy-foglio-firma-row button {
   padding: 8px 14px;
   border: none;
   border-radius: 1em;
@@ -1988,4 +1989,78 @@ body {
 
 .therapist-halfday-row-outside {
   color: #ccc;
+}
+
+.foglio-firma-badges {
+  display: inline;
+  gap: 6px;
+  float: right;
+}
+
+.foglio-firma-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.foglio-firma-badge-first {
+  background: #d0e8ff;
+  color: #1966E2;
+}
+
+.foglio-firma-badge-last {
+  background: #ffe0b2;
+  color: #b8860b;
+}
+
+.foglio-firma-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.foglio-firma-cell {
+  border: 1px solid #a0b0fd;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.foglio-firma-cell:hover {
+  background: #f4f4f4;
+  border-color: #266e5a;
+}
+
+.foglio-firma-cell-name {
+  font-weight: bold;
+  font-size: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foglio-firma-cell-therapies,
+.foglio-firma-cell-date {
+  font-size: 12px;
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.therapy-foglio-firma-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 1em;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  margin-bottom: 2em;
+}
+
+.therapy-foglio-firma-label {
+  font-weight: 500;
 }

@@ -168,6 +168,8 @@ namespace minerva.planningfkt.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Status = table.Column<int>(type: "int", nullable: false),
                     PatientId = table.Column<int>(type: "int", nullable: false),
+                    BillingCategory = table.Column<int>(type: "int", nullable: false),
+                    FoglioFirmaStatus = table.Column<int>(type: "int", nullable: false),
                     ModDate = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     ModUser = table.Column<int>(type: "int", nullable: false)
                 },

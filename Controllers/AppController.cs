@@ -46,6 +46,55 @@ public partial class AppController : ControllerBase {
   // skipping EF's change tracking cuts real overhead now that these tables hold
   // years of real data, without touching any of the many call sites that share
   // these caches (CPU: Giorno/Settimana/Alerts/Presenze/Mese all felt slow).
+  // Called after every TherapySlot status change (Presenze/CycleStatus and
+  // Giorno/ChangeStatus - the only two places a slot's status is ever set).
+  // Sums every TherapyPart's own SessionCount against how many Done slots exist
+  // across the whole therapy - if they match, the therapy is auto-completed
+  // (CPU's call), which is what actually drives the Foglio Firma
+  // InProgress -> ToBeFinalized gate. Symmetric: if a Done slot gets reverted
+  // after the therapy had already auto-completed, it reverts back out of
+  // Completed too, so the count stays meaningful in both directions.
+  private void RecomputeTherapyCompletion(int therapyPartId) {
+    var part = _db.TherapyParts.Find(therapyPartId);
+    if (part == null) {
+      return;
+    }
+
+    var therapy = _db.Therapies.Find(part.TherapyId);
+    if (therapy == null || therapy.Status == TherapyStatus.Cancelled) {
+      return;
+    }
+
+    var allParts = _db.TherapyParts.Where(p => p.TherapyId == therapy.Id).ToList();
+    var totalRequired = allParts.Sum(p => p.SessionCount);
+    var partIds = allParts.Select(p => p.Id).ToList();
+    var totalDone = _db.TherapySlots.Count(s => partIds.Contains(s.TherapyPartId) && s.Status == TherapySlotStatus.Done);
+
+    var isComplete = totalRequired > 0 && totalDone >= totalRequired;
+
+    if (isComplete && therapy.Status != TherapyStatus.Completed) {
+      therapy.Status = TherapyStatus.Completed;
+
+      // Foglio Firma auto-advance on completion - Privata jumps straight to
+      // Completed (the row's never shown for it anyway); everyone else only
+      // advances InProgress -> ToBeFinalized, staying ToBeCreated if the manual
+      // "creato" step hasn't happened yet (CPU's call).
+      if (therapy.BillingCategory == TherapyBillingCategory.Privata) {
+        therapy.FoglioFirmaStatus = FoglioFirmaStatus.Completed;
+      } else if (therapy.FoglioFirmaStatus == FoglioFirmaStatus.InProgress) {
+        therapy.FoglioFirmaStatus = FoglioFirmaStatus.ToBeFinalized;
+      }
+
+      _db.SaveChanges();
+    } else if (!isComplete && therapy.Status == TherapyStatus.Completed) {
+      // FoglioFirmaStatus deliberately does NOT revert here - once advanced, it
+      // stays put even if a Done slot later gets un-marked (CPU's chosen
+      // default: safer than silently reopening finalized paperwork).
+      therapy.Status = TherapyStatus.Scheduled;
+      _db.SaveChanges();
+    }
+  }
+
   private Dictionary<int, TherapyPart> GetPartCache() {
     return _partCache ??= _db.TherapyParts.AsNoTracking().ToDictionary(p => p.Id, p => p);
   }
