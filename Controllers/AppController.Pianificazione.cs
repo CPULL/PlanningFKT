@@ -86,6 +86,33 @@ public partial class AppController {
     return availability.Any(a => timeSlot >= a.StartTime && newEnd <= a.EndTime);
   }
 
+  // A therapist's effective area at a specific moment - checks whether the
+  // matching TherapistAvailability window (if any) has an override, falling
+  // back to their main OperatingArea when it doesn't (or no window matches at
+  // all, e.g. an overtime slot outside any declared window). CPU's call: a
+  // therapist can be, say, mostly-Palestra-plus-aiuto in the morning and pure
+  // Reparto in the afternoon, on a fixed weekly schedule.
+  private int GetEffectiveOperatingArea(Therapist therapist, DateOnly date, int timeSlot) {
+    var dayOfWeek = (int)date.DayOfWeek;
+
+    _availabilityByTherapistDayCache ??= new Dictionary<(int, int), List<TherapistAvailability>>();
+    var key = (therapist.Id, dayOfWeek);
+
+    if (!_availabilityByTherapistDayCache.TryGetValue(key, out var availability)) {
+      availability = _db.TherapistAvailabilities
+        .Where(a => a.TherapistId == therapist.Id && a.DayOfWeek == dayOfWeek)
+        .ToList();
+      _availabilityByTherapistDayCache[key] = availability;
+    }
+
+    var matchingWindow = availability.FirstOrDefault(a => timeSlot >= a.StartTime && timeSlot < a.EndTime);
+    if (matchingWindow != null && matchingWindow.OverrideOperatingArea.HasValue) {
+      return matchingWindow.OverrideOperatingArea.Value;
+    }
+
+    return therapist.OperatingArea;
+  }
+
   // Mirrors the frontend's vacationCoverage split-at-13:00 logic, server-side.
   private bool IsBlockedByVacation(int therapistId, DateOnly date, int timeSlot, int spanSlots) {
     var noonSlot = 52; // 13:00 in 15-min slots from midnight
@@ -156,6 +183,148 @@ public partial class AppController {
     }
 
     return null;
+  }
+
+  // Ginnastica Attiva only cares about REPARTO bookings for this therapist -
+  // another Palestra patient at the same time is fine (no active intervention
+  // needed, no capacity consumed - CPU's call). Deliberately does NOT reuse
+  // HasTherapistConflict, which would incorrectly block on harmless Palestra
+  // overlaps too.
+  private bool HasRepartoConflictForGinnasticaAttiva(int therapistId, DateOnly date, int timeSlot, int spanSlots) {
+    var newEnd = timeSlot + spanSlots;
+
+    var existingSlots = _db.TherapySlots
+      .Where(s => s.TherapistId == therapistId && s.Date == date && s.Status != TherapySlotStatus.Rescheduled)
+      .ToList();
+
+    foreach (var slot in existingSlots) {
+      var part = _db.TherapyParts.Find(slot.TherapyPartId);
+      var type = part != null ? _db.TherapyTypes.Find(part.TherapyTypeId) : null;
+
+      if (type == null || type.Category != TherapyCategory.Reparto) {
+        continue;
+      }
+
+      var existingSpan = GetSpanSlots(type);
+      var existingEnd = slot.TimeSlot + existingSpan;
+
+      if (timeSlot < existingEnd && newEnd > slot.TimeSlot) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Auto-attaches Ginnastica Attiva to a just-placed Rieducazione Motoria/
+  // Isocinetica slot, if its TherapyPart requested it. Call AFTER the slot (and
+  // any same-day siblings from the same placement batch) is already saved, so
+  // the day's picture is complete when checking for Reparto conflicts.
+  //
+  // Placement rule (CPU's design): GA goes on whichever edge is free of Reparto
+  // bookings for this therapist - if Reparto exists only before RM, GA goes
+  // after; if only after, GA goes before; otherwise (neither or both), after is
+  // tried first. Always prefers a full 30-minute reservation (2 slots) even
+  // when only 15 min is requested, so a later resize never needs to shift
+  // anything else; falls back to just the requested amount if 30 min doesn't
+  // fit anywhere; skips attaching GA entirely if even that doesn't fit.
+  private void AutoPlaceGinnasticaAttiva(TherapySlot rmSlot) {
+    if (rmSlot.TherapistId == null) {
+      return;
+    }
+
+    var part = _db.TherapyParts.Find(rmSlot.TherapyPartId);
+    if (part == null || part.DefaultGinnasticaAttivaSlots <= 0) {
+      return;
+    }
+
+    var type = _db.TherapyTypes.Find(part.TherapyTypeId);
+    if (type == null || type.AllowsGinnasticaAttiva == 0) {
+      return;
+    }
+
+    var therapistId = rmSlot.TherapistId.Value;
+    var date = rmSlot.Date;
+    var rmSpan = GetSpanSlots(type);
+    var rmStart = rmSlot.TimeSlot;
+    var rmEnd = rmStart + rmSpan;
+    var requestedSlots = part.DefaultGinnasticaAttivaSlots;
+    const int reserveSlots = 2; // 30 minutes - CPU's call, reserved regardless of the requested amount
+
+    var daySlots = _db.TherapySlots
+      .Where(s => s.TherapistId == therapistId && s.Date == date && s.Id != rmSlot.Id && s.Status != TherapySlotStatus.Rescheduled)
+      .ToList();
+
+    var repartoBefore = false;
+    var repartoAfter = false;
+
+    foreach (var s in daySlots) {
+      var sPart = _db.TherapyParts.Find(s.TherapyPartId);
+      var sType = sPart != null ? _db.TherapyTypes.Find(sPart.TherapyTypeId) : null;
+
+      if (sType == null || sType.Category != TherapyCategory.Reparto) {
+        continue;
+      }
+
+      var sSpan = GetSpanSlots(sType);
+
+      if (s.TimeSlot + sSpan <= rmStart) {
+        repartoBefore = true;
+      }
+      if (s.TimeSlot >= rmEnd) {
+        repartoAfter = true;
+      }
+    }
+
+    var tryAfterFirst = !repartoAfter;
+
+    int MaxFreeSlotsAtEdge(bool after) {
+      var count = 0;
+      while (count < reserveSlots) {
+        var candidateStart = after ? rmEnd + count : rmStart - count - 1;
+        if (candidateStart < 0) {
+          break;
+        }
+        if (!IsWithinAvailability(therapistId, date, candidateStart, 1)
+            || IsBlockedByVacation(therapistId, date, candidateStart, 1)
+            || HasRepartoConflictForGinnasticaAttiva(therapistId, date, candidateStart, 1)) {
+          break;
+        }
+        count++;
+      }
+      return count;
+    }
+
+    var afterRoom = MaxFreeSlotsAtEdge(true);
+    var beforeRoom = MaxFreeSlotsAtEdge(false);
+
+    bool TryPlace(int neededSlots, out bool placeAfterResult) {
+      if (tryAfterFirst && afterRoom >= neededSlots) {
+        placeAfterResult = true;
+        return true;
+      }
+      if (!tryAfterFirst && beforeRoom >= neededSlots) {
+        placeAfterResult = false;
+        return true;
+      }
+      if (afterRoom >= neededSlots) {
+        placeAfterResult = true;
+        return true;
+      }
+      if (beforeRoom >= neededSlots) {
+        placeAfterResult = false;
+        return true;
+      }
+      placeAfterResult = false;
+      return false;
+    }
+
+    bool placeAfter;
+    if (!TryPlace(reserveSlots, out placeAfter) && !TryPlace(requestedSlots, out placeAfter)) {
+      return; // Doesn't fit anywhere, even at the bare requested amount - skip.
+    }
+
+    rmSlot.GinnasticaAttivaSlots = placeAfter ? requestedSlots : -requestedSlots;
   }
 
   private bool HasPatientConflict(int patientId, DateOnly date, int timeSlot, int spanSlots, int therapyTypeId) {
@@ -490,12 +659,22 @@ public partial class AppController {
       }
     }
 
+    var newSlots = new List<TherapySlot>();
     foreach (var p in request.Placements) {
-      _db.TherapySlots.Add(BuildTherapySlot(part.Id, p.Date, p.TimeSlot, request.TherapistId));
+      var newSlot = BuildTherapySlot(part.Id, p.Date, p.TimeSlot, request.TherapistId);
+      newSlots.Add(newSlot);
+      _db.TherapySlots.Add(newSlot);
     }
 
     therapy.Status = TherapyStatus.Scheduled;
     _db.SaveChanges();
+
+    if (part.DefaultGinnasticaAttivaSlots > 0) {
+      foreach (var newSlot in newSlots) {
+        AutoPlaceGinnasticaAttiva(newSlot);
+      }
+      _db.SaveChanges();
+    }
 
     return Ok();
   }

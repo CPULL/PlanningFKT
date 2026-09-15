@@ -13,6 +13,12 @@ public class TherapySlot {
 
   public int Status { get; set; }
 
+  // 0 = none. Positive N = N x 15 min of autonomous exercise AFTER this session;
+  // negative N = N x 15 min BEFORE it. Only meaningful when this slot's
+  // TherapyType.AllowsGinnasticaAttiva - same slot record, no separate status/
+  // attendance/session-count effect (CPU's call).
+  public int GinnasticaAttivaSlots { get; set; }
+
   public int? RescheduledToId { get; set; }
 
   // Set only by Presenze's status-cycling action for now (CPU's scope call) - other

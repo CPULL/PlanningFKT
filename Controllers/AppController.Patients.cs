@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using minerva.planningfkt.models;
 
 namespace minerva.planningfkt.controllers;
@@ -14,12 +16,67 @@ public partial class AppController {
     public int Sex { get; set; }
   }
 
+  // Patients with at least one TherapySlot for this therapist in the last 6
+  // months - raw SQL per CPU's call, not an EF join.
+  private HashSet<int> GetPatientIdsForTherapistRecentSlots(int therapistId) {
+    var results = new HashSet<int>();
+    var connection = _db.Database.GetDbConnection();
+    var shouldClose = connection.State != System.Data.ConnectionState.Open;
+    if (shouldClose) {
+      connection.Open();
+    }
+
+    try {
+      using var command = connection.CreateCommand();
+      command.CommandText = @"
+        SELECT DISTINCT therapies.PatientId AS patient_id
+        FROM therapyslots
+        INNER JOIN therapyparts ON therapyparts.Id = therapyslots.TherapyPartId
+        INNER JOIN therapies ON therapies.Id = therapyparts.TherapyId
+        WHERE therapyslots.TherapistId = @therapistId
+          AND therapyslots.Date >= @sixMonthsAgo";
+
+      var therapistParam = command.CreateParameter();
+      therapistParam.ParameterName = "@therapistId";
+      therapistParam.Value = therapistId;
+      command.Parameters.Add(therapistParam);
+
+      var dateParam = command.CreateParameter();
+      dateParam.ParameterName = "@sixMonthsAgo";
+      dateParam.Value = DateTime.Today.AddMonths(-6);
+      command.Parameters.Add(dateParam);
+
+      using var reader = command.ExecuteReader();
+      while (reader.Read()) {
+        results.Add(reader.GetInt32(reader.GetOrdinal("patient_id")));
+      }
+    } finally {
+      if (shouldClose) {
+        connection.Close();
+      }
+    }
+
+    return results;
+  }
+
   [HttpGet("/Patients/List")]
-  public IActionResult PatientsList(string? filter, int page = 1, string sortBy = "created", string sortDir = "desc") {
+  public IActionResult PatientsList(string? filter, int page = 1, string sortBy = "created", string sortDir = "desc", bool soloMieiPazienti = false) {
     var query = _db.Patients.AsQueryable();
 
     if (!string.IsNullOrEmpty(filter) && filter.Length >= 3) {
       query = query.Where(p => p.Name.Contains(filter) || p.Phone.Contains(filter));
+    }
+
+    // "Solo i miei pazienti" (therapists only) - CPU's call to use raw SQL here
+    // rather than an EF join.
+    if (soloMieiPazienti) {
+      var currentTherapistId = GetCurrentTherapistId();
+      if (currentTherapistId == null) {
+        return Forbid();
+      }
+
+      var myPatientIds = GetPatientIdsForTherapistRecentSlots(currentTherapistId.Value);
+      query = query.Where(p => myPatientIds.Contains(p.Id));
     }
 
     // Duplicate-name detection runs against the whole filtered set (not just the
@@ -125,14 +182,22 @@ public partial class AppController {
 
   // "Current" = not yet Completed/Cancelled. Only one such Therapy can exist per
   // patient at a time (enforced on Create), so the most recent one is unambiguous.
-  private object? GetCurrentTherapyInfo(int patientId) {
+  // "Current" = not yet Cancelled; prefers an actually-active one, falling back
+  // to a Completed one still awaiting Foglio Firma finalization. Shared by
+  // GetCurrentTherapyInfo (patient page) and PatientsStatus (Patient Status
+  // page) so both agree on which therapy is "current."
+  private Therapy? GetCurrentTherapy(int patientId) {
     var candidates = _db.Therapies
       .Where(t => t.PatientId == patientId && t.Status != TherapyStatus.Cancelled)
       .OrderByDescending(t => t.Id)
       .ToList();
 
-    var therapy = candidates.FirstOrDefault(t => t.Status != TherapyStatus.Completed)
+    return candidates.FirstOrDefault(t => t.Status != TherapyStatus.Completed)
       ?? candidates.FirstOrDefault(t => !IsTherapyFullyDone(t));
+  }
+
+  private object? GetCurrentTherapyInfo(int patientId) {
+    var therapy = GetCurrentTherapy(patientId);
 
     if (therapy == null) {
       return null;
@@ -158,6 +223,7 @@ public partial class AppController {
           therapyTypeExecutionType = therapyTypeExecutionTypes.ContainsKey(p.TherapyTypeId) ? therapyTypeExecutionTypes[p.TherapyTypeId] : (int?)null,
           therapyTypeDuration = therapyTypeDurations.ContainsKey(p.TherapyTypeId) ? therapyTypeDurations[p.TherapyTypeId] : (int?)null,
           p.SessionCount,
+          p.DefaultGinnasticaAttivaSlots,
           placedCount,
           remaining = p.SessionCount - placedCount
         };
@@ -184,6 +250,9 @@ public partial class AppController {
     public int TimeSlot { get; set; }
     public string TherapyTypeName { get; set; } = "?";
     public string TherapistName { get; set; } = "Reparto";
+    // Small extra detail shown next to the line, e.g. "+15 min prima" - empty
+    // when this slot has no Ginnastica Attiva attached.
+    public string GinnasticaAttivaLabel { get; set; } = "";
   }
 
   // All slots for the patient's current therapy (see GetCurrentTherapyInfo above for
@@ -221,13 +290,20 @@ public partial class AppController {
         var part = partCache.ContainsKey(s.TherapyPartId) ? partCache[s.TherapyPartId] : null;
         var type = part != null && typeCache.ContainsKey(part.TherapyTypeId) ? typeCache[part.TherapyTypeId] : null;
 
+        var gaLabel = "";
+        if (s.GinnasticaAttivaSlots != 0) {
+          var minutes = Math.Abs(s.GinnasticaAttivaSlots) * 15;
+          gaLabel = "+" + minutes + " min " + (s.GinnasticaAttivaSlots < 0 ? "prima" : "dopo");
+        }
+
         return new PatientPlanSlotDto {
           Date = s.Date,
           TimeSlot = s.TimeSlot,
           TherapyTypeName = type != null ? type.Name : "?",
           TherapistName = s.TherapistId.HasValue && therapistNameCache.ContainsKey(s.TherapistId.Value)
             ? therapistNameCache[s.TherapistId.Value]
-            : "Reparto"
+            : "Reparto",
+          GinnasticaAttivaLabel = gaLabel
         };
       })
       .OrderBy(s => s.Date)
@@ -407,6 +483,99 @@ public partial class AppController {
 
     var fullPath = Path.Combine(GetPatientDocumentFolder(), patient.DocumentFileName);
     return Ok(new { exists = System.IO.File.Exists(fullPath) });
+  }
+
+  private class PatientStatusSlotDto {
+    public DateOnly Date { get; set; }
+    public int TimeSlot { get; set; }
+    public string TherapyTypeName { get; set; } = "?";
+    public string TherapistName { get; set; } = "Reparto";
+    public int Status { get; set; }
+    public string StatusLabel { get; set; } = "?";
+  }
+
+  // Quick-glance page (CPU's call): name, phone, current therapy, sessions
+  // remaining, next 3 upcoming slots, most recent past slot with its
+  // done/not-done status, and whether there's a document to view. Reachable
+  // from a button next to the patient's name both on the patient page and in
+  // the slot detail popup - both open this same page.
+  [HttpGet("/Patients/Status/{id}")]
+  public IActionResult PatientsStatus(int id) {
+    if (GetCurrentTherapistId() == null) {
+      return Forbid();
+    }
+
+    var patient = _db.Patients.Find(id);
+
+    if (patient == null) {
+      return NotFound();
+    }
+
+    var hasDocument = !string.IsNullOrEmpty(patient.DocumentFileName)
+      && System.IO.File.Exists(Path.Combine(GetPatientDocumentFolder(), patient.DocumentFileName));
+
+    var currentTherapy = GetCurrentTherapy(id);
+    var currentTherapyInfo = currentTherapy != null ? GetCurrentTherapyInfo(id) : null;
+
+    var today = DateOnly.FromDateTime(DateTime.Today);
+    var typeCache = GetTypeCache();
+    var partCache = GetPartCache();
+    var therapistNameCache = GetTherapistNameCache();
+
+    // Every part belonging to the current therapy (if any) - the patient may
+    // have older (Completed) therapies too, but "next"/"last" slots should only
+    // ever reflect the current one in practice, so scoping here avoids pulling
+    // in history from long-finished plans.
+    var partIds = currentTherapy == null
+      ? new List<int>()
+      : _db.TherapyParts.Where(p => p.TherapyId == currentTherapy.Id).Select(p => p.Id).ToList();
+
+    List<PatientStatusSlotDto> BuildSlotDtos(IEnumerable<TherapySlot> slots) {
+      return slots.Select(s => {
+        var part = partCache.ContainsKey(s.TherapyPartId) ? partCache[s.TherapyPartId] : null;
+        var type = part != null && typeCache.ContainsKey(part.TherapyTypeId) ? typeCache[part.TherapyTypeId] : null;
+
+        return new PatientStatusSlotDto {
+          Date = s.Date,
+          TimeSlot = s.TimeSlot,
+          TherapyTypeName = type != null ? type.Name : "?",
+          TherapistName = s.TherapistId.HasValue && therapistNameCache.ContainsKey(s.TherapistId.Value)
+            ? therapistNameCache[s.TherapistId.Value]
+            : "Reparto",
+          Status = s.Status,
+          StatusLabel = TherapySlotStatus.ToLabel(s.Status)
+        };
+      }).ToList();
+    }
+
+    var nextSlots = new List<PatientStatusSlotDto>();
+    var lastPastSlot = (PatientStatusSlotDto?)null;
+
+    if (partIds.Count > 0) {
+      var upcoming = _db.TherapySlots
+        .Where(s => partIds.Contains(s.TherapyPartId) && s.Date >= today && s.Status == TherapySlotStatus.ToBeDone)
+        .OrderBy(s => s.Date)
+        .ThenBy(s => s.TimeSlot)
+        .Take(3)
+        .ToList();
+      nextSlots = BuildSlotDtos(upcoming);
+
+      var past = _db.TherapySlots
+        .Where(s => partIds.Contains(s.TherapyPartId) && s.Date < today && s.Status != TherapySlotStatus.Rescheduled)
+        .OrderByDescending(s => s.Date)
+        .ThenByDescending(s => s.TimeSlot)
+        .FirstOrDefault();
+      lastPastSlot = past != null ? BuildSlotDtos(new[] { past }).First() : null;
+    }
+
+    return Ok(new {
+      patientName = patient.Name,
+      patientPhone = patient.Phone,
+      hasDocument,
+      currentTherapy = currentTherapyInfo,
+      nextSlots,
+      lastPastSlot
+    });
   }
 
   [HttpGet("/Patients/Document/{id}")]

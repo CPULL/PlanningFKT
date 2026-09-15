@@ -21,10 +21,12 @@ public class AppDbContext : DbContext {
   public DbSet<AlertDismissal> AlertDismissals => Set<AlertDismissal>();
   public DbSet<AlertMarkedImportant> AlertMarkedImportants => Set<AlertMarkedImportant>();
   public DbSet<TherapistAbsenceCall> TherapistAbsenceCalls => Set<TherapistAbsenceCall>();
+  public DbSet<FoglioFirmaChecklistItem> FoglioFirmaChecklistItems => Set<FoglioFirmaChecklistItem>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder) {
     modelBuilder.Entity<AlertDismissal>().HasKey(d => d.Key);
     modelBuilder.Entity<AlertMarkedImportant>().HasKey(m => m.Key);
+    modelBuilder.Entity<FoglioFirmaChecklistItem>().HasKey(c => c.Key);
 
     // Patient -> Therapy (cascade: deleting a patient deletes all their therapies)
     modelBuilder.Entity<Therapy>()

@@ -26,6 +26,11 @@ public class TherapyType {
 
   public int TherapyWeeklyFrequency { get; set; }
 
+  // Ginnastica Attiva is an autonomous-exercise extension of a Rieducazione
+  // Motoria/Isocinetica session - manually flagged true only for those two
+  // TherapyType rows (CPU's convention, avoids fragile name-matching).
+  public int AllowsGinnasticaAttiva { get; set; }
+
   public int IsActive { get; set; }
 
   public DateTime ModDate { get; set; }

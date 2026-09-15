@@ -506,6 +506,32 @@ $(function() {
     return d;
   }
 
+  // Keeps Giorno/Settimana/Presenze's current dates in sync (CPU's call). Call
+  // right after changing whichever one the user just navigated - propagates to
+  // the other two:
+  // - from Settimana: both go to that week's Monday.
+  // - from Giorno or Presenze: Settimana goes to the week containing that date,
+  //   and the other of the two (Giorno/Presenze) takes the same date.
+  // - Presenze never shows a future date - clamped to today whenever it would
+  //   otherwise be set past it, regardless of source.
+  function syncSchedulingDates(source) {
+    var today = getTodayForGiorno();
+
+    if (source === 'settimana') {
+      giornoCurrentDate = new Date(settimanaCurrentWeekStart);
+      presenzeCurrentDate = settimanaCurrentWeekStart > today ? today : new Date(settimanaCurrentWeekStart);
+    } else if (source === 'giorno') {
+      settimanaCurrentWeekStart = getMondayOfWeek(giornoCurrentDate);
+      presenzeCurrentDate = giornoCurrentDate > today ? today : new Date(giornoCurrentDate);
+    } else if (source === 'presenze') {
+      if (presenzeCurrentDate > today) {
+        presenzeCurrentDate = today;
+      }
+      giornoCurrentDate = new Date(presenzeCurrentDate);
+      settimanaCurrentWeekStart = getMondayOfWeek(presenzeCurrentDate);
+    }
+  }
+
   // Availability rules (only apply to days that actually have slots defined - a day
   // with no slots at all is simply skipped, not an error): each slot must be at least
   // 1 hour (4 slots) long, and slots within the same day must not overlap.
@@ -976,6 +1002,8 @@ $(function() {
       }
     } else if (view === 'piano') {
       renderPianoView(id);
+    } else if (view === 'patientStatus') {
+      renderPatientStatusView(id);
     } else if (view === 'avvisi') {
       renderAvvisiList();
     } else if (view === 'pianificazione') {
@@ -1003,13 +1031,20 @@ $(function() {
     }
   }
 
+  // Standing default date format everywhere (CPU's call): "<day> <month name>
+  // <year>" - e.g. "16 Settembre 2026". Applied here at the shared function so
+  // every existing call site picks it up without auditing each one individually.
+  // Standing default date format everywhere (CPU's call): "<day> <month name>
+  // <year>" only - no time component - e.g. "16 Settembre 2026". Applied here
+  // at the shared function so every existing call site picks it up without
+  // auditing each one individually.
   function formatDate(isoString) {
     if (!isoString) {
       return '';
     }
 
     var d = new Date(isoString);
-    return d.toLocaleDateString('it-IT') + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    return d.getDate() + ' ' + monthNamesFull[d.getMonth()] + ' ' + d.getFullYear();
   }
 
   function intToHexColor(value) {
@@ -1254,6 +1289,7 @@ $(function() {
     var $prev = $('<button type="button" class="scheduling-nav-btn">‹</button>');
     $prev.on('click', function() {
       presenzeCurrentDate = addWeekdays(presenzeCurrentDate, -1);
+      syncSchedulingDates('presenze');
       buildPresenzeView();
     });
 
@@ -1264,6 +1300,7 @@ $(function() {
         return;
       }
       presenzeCurrentDate = addWeekdays(presenzeCurrentDate, 1);
+      syncSchedulingDates('presenze');
       buildPresenzeView();
     });
 
@@ -1272,6 +1309,7 @@ $(function() {
       showQuickDatePicker(presenzeCurrentDate, function(pickedDate) {
         var todayCheck = getTodayForGiorno();
         presenzeCurrentDate = pickedDate > todayCheck ? todayCheck : pickedDate;
+        syncSchedulingDates('presenze');
         buildPresenzeView();
       });
     });
@@ -1279,6 +1317,7 @@ $(function() {
     var $today = $('<button type="button" class="secondary">Vai ad Oggi</button>');
     $today.on('click', function() {
       presenzeCurrentDate = getTodayForGiorno();
+      syncSchedulingDates('presenze');
       buildPresenzeView();
     });
 
@@ -1293,7 +1332,7 @@ $(function() {
       return '<span style="background-color:green;border: 1px solid black;">✔</span>';
     }
     if (status === 2) {
-      return '<span style="background-color:orange;border: 1px solid black;">✖</span>';
+      return '<span style="background-color:red;border: 1px solid black;">✖</span>';
     }
     return '<span style="background-color:orange;border: 1px solid black;">?</span>';
   }
@@ -1325,7 +1364,6 @@ $(function() {
     var gridStart = data.gridStart;
     var gridEnd = data.gridEnd;
     var rowCount = gridEnd - gridStart;
-    var rowHeightPx = PIANIFICAZIONE_ROW_HEIGHT;
 
     var $wrapper = $('<div class="scheduling-view pianificazione-wrapper"></div>');
     var $table = $('<table class="scheduling-grid pianificazione-grid"></table>');
@@ -1357,7 +1395,7 @@ $(function() {
     for (var row = 0; row < rowCount; row++) {
       var slotVal = gridStart + row;
       var $row = $('<tr></tr>');
-      $row.append('<td class="scheduling-time-cell" style="height:' + rowHeightPx + 'px">' + slotToTime(slotVal) + '</td>');
+      $row.append('<td class="scheduling-time-cell presenze-giorno-cell">' + slotToTime(slotVal) + '</td>');
 
       var overlayInfo = overlaySlots[row];
       var prevInfo = row > 0 ? overlaySlots[row - 1] : null;
@@ -1365,7 +1403,7 @@ $(function() {
       var overlayClass = overlayInfo.type === 'vacation' ? ' vacation-overlay' :
         (overlayInfo.type === 'unavailable' ? ' availability-overlay' : '');
 
-      var $td = $('<td class="giorno-settimana-cell' + overlayClass + '" style="height:' + rowHeightPx + 'px"></td>');
+      var $td = $('<td class="giorno-settimana-cell presenze-giorno-cell' + overlayClass + '"></td>');
 
       if (overlayInfo.type === 'vacation' && isRunStart) {
         $td.append('<span class="giorno-vacation-label">' + overlayInfo.label + '</span>');
@@ -1394,17 +1432,22 @@ $(function() {
       if (showAudit) {
         $overlay.find('.presenze-audit-line').text(presenzeAuditLineHtml(item.modUserName, item.modDate));
       }
+
+      // Height now comes from a fixed CSS class per span (1-4 slots), not a
+      // JS-computed pixel value - lets N/L/P each redefine it independently
+      // (CPU's call). Width/gap similarly moved to CSS custom properties.
+      var spanClamped = Math.max(1, Math.min(4, span));
+      var spanClass = 'pianificazione-session-overlay-span-' + spanClamped + (showAudit ? '-audit' : '');
+      $overlay.addClass(spanClass);
       $overlay.css({
         top: '0',
-        height: (span * rowHeightPx * (showAudit ? 2 : 1) - 1) + 'px',
-        left: 'calc((100% - 2em) * ' + idx + ' / ' + groupSize + ')',
-        width: 'calc((100% - 2em) / ' + groupSize + ')'
+        '--group-index': idx,
+        '--group-count': groupSize
       });
 
       var hex = intToHexColor(item.color);
       $overlay.css({
-        background: hex,
-        border: '1px solid ' + halfBrightnessHex(hex)
+        background: hex
       });
 
       var $startTd = tdRefs[rowIndex];
@@ -1600,6 +1643,7 @@ $(function() {
           (function(clickDate) {
             $cell.on('click', function() {
               giornoCurrentDate = clickDate;
+              syncSchedulingDates('giorno');
               if (meseSelectedTherapistId) {
                 giornoMode = 'therapist';
                 giornoSelectedTherapistId = meseSelectedTherapistId;
@@ -1628,6 +1672,19 @@ $(function() {
   // volume). List 1 is the roster for the next working day; lists 2/3 are
   // global (not tied to tomorrow), each windowed to a month back / a week
   // forward around today so old or far-future therapies don't clutter them.
+  //
+  // Fatto checkbox: purely client-side DOM moves on toggle (CPU: "no page
+  // reload should be done, it makes it impossible to progress") - checking
+  // moves the cell into the shared "Fatti" section; unchecking moves it back
+  // to whichever original section it came from. The server call still fires
+  // (to persist the flag) but the UI never waits on a full refetch.
+  //
+  // Each of the 3 to-do sections shows a live "(N da fare)" count in its title,
+  // and a section's title+grid are only shown at all when it actually has
+  // content (CPU's call). One single page-wide "Tutto fatto!" heading (not
+  // per-section) appears only once ALL THREE sections are simultaneously
+  // empty - all three sections' own titles/grids stay hidden while it's
+  // showing, since none of them have content to show a title for.
   function renderFogliFirmaView() {
     setTopbarActions(null);
     $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
@@ -1636,8 +1693,56 @@ $(function() {
       var $wrapper = $('<div></div>');
       var dateObj = parseDateISO(result.date);
 
-      function buildRosterCell(p) {
-        var $cell = $('<div class="foglio-firma-cell"></div>');
+      var $fattiGrid = $('<div class="foglio-firma-grid"></div>');
+      var $fattiEmpty = $('<div class="scheduling-empty">Nessuno.</div>');
+      var $tuttoFatto = $('<h2 class="foglio-firma-tutto-fatto"></h2>').text('Tutto fatto!');
+
+      function refreshEmptyState($grid, $empty) {
+        if ($grid.children().length === 0) {
+          $grid.hide();
+          $empty.show();
+        } else {
+          $grid.show();
+          $empty.hide();
+        }
+      }
+
+      var sectionRefreshFns = [];
+
+      function checkAllDone() {
+        var allEmpty = sectionRefreshFns.every(function(getCount) { return getCount() === 0; });
+        $tuttoFatto.toggle(allEmpty);
+      }
+
+      // $homeRefresh is the cell's ORIGINAL section's own refresh function -
+      // unchecking moves the cell back there and re-runs it so that section's
+      // title/count/visibility updates immediately.
+      function wireFattoCheckbox($checkbox, $cell, key, $homeGrid, $homeRefresh) {
+        $checkbox.on('click', function(e) {
+          e.stopPropagation();
+        });
+        $checkbox.on('change', function() {
+          var isFatto = $checkbox.is(':checked');
+
+          $.ajax({
+            url: 'FogliFirma/ToggleFatto',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ key: key })
+          });
+
+          $cell.toggleClass('foglio-firma-cell-fatto', isFatto);
+          $cell.detach().appendTo(isFatto ? $fattiGrid : $homeGrid);
+          refreshEmptyState($fattiGrid, $fattiEmpty);
+          $homeRefresh();
+        });
+      }
+
+      function buildRosterCell(p, $homeGrid, $homeRefresh) {
+        var $cell = $('<div class="foglio-firma-cell"></div>').toggleClass('foglio-firma-cell-fatto', p.fatto);
+        var $checkbox = $('<input type="checkbox" class="foglio-firma-checkbox">').prop('checked', p.fatto);
+        wireFattoCheckbox($checkbox, $cell, p.key, $homeGrid, $homeRefresh);
+        $cell.append($checkbox);
         $cell.append($('<div class="foglio-firma-cell-name"></div>').text(p.patientName));
 
         var $therapiesDiv = $('<div class="foglio-firma-cell-therapies"></div>').text(p.therapies);
@@ -1658,8 +1763,11 @@ $(function() {
         return $cell;
       }
 
-      function buildTherapyCell(t) {
-        var $cell = $('<div class="foglio-firma-cell"></div>');
+      function buildTherapyCell(t, $homeGrid, $homeRefresh) {
+        var $cell = $('<div class="foglio-firma-cell"></div>').toggleClass('foglio-firma-cell-fatto', t.fatto);
+        var $checkbox = $('<input type="checkbox" class="foglio-firma-checkbox">').prop('checked', t.fatto);
+        wireFattoCheckbox($checkbox, $cell, t.key, $homeGrid, $homeRefresh);
+        $cell.append($checkbox);
         $cell.append($('<div class="foglio-firma-cell-name"></div>').text(t.patientName));
         $cell.append($('<div class="foglio-firma-cell-therapies"></div>').text(t.therapies));
         $cell.append($('<div class="foglio-firma-cell-date"></div>').text(t.relevantDate));
@@ -1667,22 +1775,50 @@ $(function() {
         return $cell;
       }
 
-      function buildSection(title, items, buildCell) {
-        $wrapper.append($('<h3></h3>').text(title));
-        if (items.length === 0) {
-          $wrapper.append('<div class="scheduling-empty">Nessuno.</div>');
-          return;
-        }
+      // Only NOT-fatto items render in the section itself - fatto ones (from
+      // any section) all live together in the shared Fatti grid built below.
+      function buildSection(baseTitle, items, buildCell) {
+        var $title = $('<h3></h3>');
         var $grid = $('<div class="foglio-firma-grid"></div>');
+        var currentCount = 0;
+
+        function refreshSectionState() {
+          currentCount = $grid.children().length;
+          if (currentCount === 0) {
+            $title.hide();
+            $grid.hide();
+          } else {
+            $title.text(baseTitle + ' (' + currentCount + ' da fare)').show();
+            $grid.show();
+          }
+          checkAllDone();
+        }
+
+        sectionRefreshFns.push(function() { return currentCount; });
+
         items.forEach(function(item) {
-          $grid.append(buildCell(item));
+          var $cell = buildCell(item, $grid, refreshSectionState);
+          if (item.fatto) {
+            $fattiGrid.append($cell);
+          } else {
+            $grid.append($cell);
+          }
         });
-        $wrapper.append($grid);
+
+        $wrapper.append($title).append($grid);
+        refreshSectionState();
       }
 
       buildSection('Fogli firma per ' + formatGiornoLabel(dateObj), result.patients, buildRosterCell);
       buildSection('Foglio Firma da preparare', result.toBeCreated, buildTherapyCell);
       buildSection('Foglio Firma da chiudere', result.toBeFinalized, buildTherapyCell);
+
+      $wrapper.append($tuttoFatto);
+      checkAllDone();
+
+      $wrapper.append($('<h3></h3>').text('Fatti'));
+      $wrapper.append($fattiEmpty).append($fattiGrid);
+      refreshEmptyState($fattiGrid, $fattiEmpty);
 
       $('#content').empty().append($wrapper);
     });
@@ -1790,6 +1926,7 @@ $(function() {
                   settimanaMode = 'therapist';
                   settimanaSelectedTherapistId = proposal.therapistId;
                   settimanaCurrentWeekStart = getMondayOfWeek(parseDateOnly(proposal.proposedDate));
+                  syncSchedulingDates('settimana');
                   navigateTo('settimana');
                 })
                 .fail(function(jqXHR) {
@@ -1823,6 +1960,11 @@ $(function() {
   function renderGiornoView() {
     if (!giornoCurrentDate) {
       giornoCurrentDate = getTodayForGiorno();
+    }
+
+    if (!giornoMode && !giornoSelectedTherapistId && currentSession && !currentSession.isAccettazione) {
+      giornoMode = 'therapist';
+      giornoSelectedTherapistId = currentSession.id;
     }
 
     loadSchedulingTherapists(function() {
@@ -1913,12 +2055,14 @@ $(function() {
     var $prev = $('<button type="button" class="scheduling-nav-btn">‹</button>');
     $prev.on('click', function() {
       giornoCurrentDate = addWeekdays(giornoCurrentDate, -1);
+      syncSchedulingDates('giorno');
       buildGiornoView();
     });
 
     var $next = $('<button type="button" class="scheduling-nav-btn">›</button>');
     $next.on('click', function() {
       giornoCurrentDate = addWeekdays(giornoCurrentDate, 1);
+      syncSchedulingDates('giorno');
       buildGiornoView();
     });
 
@@ -1926,6 +2070,7 @@ $(function() {
     $dateLabel.on('click', function() {
       showQuickDatePicker(giornoCurrentDate, function(pickedDate) {
         giornoCurrentDate = pickedDate;
+        syncSchedulingDates('giorno');
         buildGiornoView();
       });
     });
@@ -1933,6 +2078,7 @@ $(function() {
     var $today = $('<button type="button" class="secondary">Vai ad Oggi</button>');
     $today.on('click', function() {
       giornoCurrentDate = getTodayForGiorno();
+      syncSchedulingDates('giorno');
       buildGiornoView();
     });
 
@@ -1965,12 +2111,14 @@ $(function() {
     var $prev = $('<button type="button" class="scheduling-nav-btn">‹</button>');
     $prev.on('click', function() {
       settimanaCurrentWeekStart = addDays(settimanaCurrentWeekStart, -7);
+      syncSchedulingDates('settimana');
       buildSettimanaView();
     });
 
     var $next = $('<button type="button" class="scheduling-nav-btn">›</button>');
     $next.on('click', function() {
       settimanaCurrentWeekStart = addDays(settimanaCurrentWeekStart, 7);
+      syncSchedulingDates('settimana');
       buildSettimanaView();
     });
 
@@ -1978,6 +2126,7 @@ $(function() {
     $dateLabel.on('click', function() {
       showQuickDatePicker(settimanaCurrentWeekStart, function(pickedDate) {
         settimanaCurrentWeekStart = getMondayOfWeek(pickedDate);
+        syncSchedulingDates('settimana');
         buildSettimanaView();
       });
     });
@@ -1985,6 +2134,7 @@ $(function() {
     var $today = $('<button type="button" class="secondary">Vai ad Oggi</button>');
     $today.on('click', function() {
       settimanaCurrentWeekStart = getMondayOfWeek(new Date());
+      syncSchedulingDates('settimana');
       buildSettimanaView();
     });
 
@@ -2087,6 +2237,10 @@ $(function() {
         bodyHtml += buildStatusRowHtml(detail, isAdmin);
       }
 
+      if (detail.allowsGinnasticaAttiva) {
+        bodyHtml += (isAdmin || isAssignedTherapist) ? buildGinnasticaAttivaEditHtml(detail) : buildGinnasticaAttivaDisplayHtml(detail);
+      }
+
       var actions = [];
 
       if (isAdmin) {
@@ -2117,6 +2271,7 @@ $(function() {
                 settimanaMode = 'therapist';
                 settimanaSelectedTherapistId = proposal.therapistId;
                 settimanaCurrentWeekStart = getMondayOfWeek(parseDateOnly(proposal.proposedDate));
+                syncSchedulingDates('settimana');
                 navigateTo('settimana');
               })
               .fail(function(jqXHR) {
@@ -2144,18 +2299,24 @@ $(function() {
       actions.push({ label: 'Chiudi', className: 'secondary', onClick: function() {} });
 
       window.showModal(bodyHtml, actions);
+      wireSlotDetailPatientClick();
 
       if (isAdmin || isAssignedTherapist) {
         $('#modal-body #slot-status-select').on('change', function() {
           changeSlotStatus(detail.id, parseInt($(this).val(), 10));
         });
+
+        if (detail.allowsGinnasticaAttiva) {
+          wireGinnasticaAttivaEdit(detail.id);
+        }
       }
     });
   }
 
-  // Therapy band (colored from TherapyType.Color) + date/time + patient (bold) +
-  // therapist/Reparto - shared between the slot detail popup and the "Cambia
-  // terapista" sub-popup, so the latter always shows what's being reassigned.
+  // Therapy band (colored from TherapyType.Color) + date/time + patient (bold,
+  // underlined link) + therapist/Reparto - shared between the slot detail popup
+  // and the "Cambia terapista" sub-popup, so the latter always shows what's
+  // being reassigned.
   function buildSlotDetailBandHtml(detail) {
     var therapyColor = detail.therapyTypeColor != null ? intToHexColor(detail.therapyTypeColor) : '#888';
     var therapistLabel = detail.therapistName ? detail.therapistName : 'Reparto';
@@ -2165,8 +2326,82 @@ $(function() {
         '<span class="slot-detail-therapy-name">' + detail.therapyTypeName + '</span>' +
       '</div>' +
       '<div class="slot-detail-datetime">' + formatGiornoLabel(dateObj) + ' - ' + slotToTime(detail.timeSlot) + '</div>' +
-      '<div class="slot-detail-patient"><b>' + detail.patientName + '</b></div>' +
+      '<div class="slot-detail-patient-row">' +
+        '<a href="#" class="slot-detail-patient-link" data-patient-id="' + (detail.patientId || '') + '">' + detail.patientName + '</a>' +
+        (detail.patientId ? ' <button type="button" class="secondary slot-detail-patient-status-btn" data-patient-id="' + detail.patientId + '">Stato paziente</button>' : '') +
+      '</div>' +
       '<div class="slot-detail-therapist">' + therapistLabel + '</div>';
+  }
+
+  // Wires the click on the patient name link and the "Stato paziente" button in
+  // a just-inserted buildSlotDetailBandHtml block - call once after appending
+  // that HTML into the DOM. Works for every user (CPU's call: no role
+  // restriction).
+  function wireSlotDetailPatientClick() {
+    $('#modal-body .slot-detail-patient-status-btn').on('click', function(e) {
+      e.stopPropagation();
+      var patientId = $(this).data('patient-id');
+      if (patientId) {
+        $('#modal-overlay').hide();
+        navigateTo('patientStatus', patientId);
+      }
+    });
+
+    $('#modal-body .slot-detail-patient-link').on('click', function(e) {
+      e.preventDefault();
+      var patientId = $(this).data('patient-id');
+      if (patientId) {
+        $('#modal-overlay').hide();
+        navigateTo('pazienti', patientId);
+      }
+    });
+  }
+
+  // Read-only line for a user who can't edit this slot (view-only viewer of a
+  // Rieducazione Motoria/Isocinetica slot).
+  function buildGinnasticaAttivaDisplayHtml(detail) {
+    var slots = Math.abs(detail.ginnasticaAttivaSlots);
+    var label = slots === 0 ? 'Nessuna' : (slots * 15) + ' min ' + (detail.ginnasticaAttivaSlots < 0 ? 'prima' : 'dopo');
+    return '<div class="slot-detail-ga-row"><b>Ginnastica Attiva:</b> ' + label + '</div>';
+  }
+
+  // Editable row - minutes input (any multiple of 15, no cap - CPU's call) +
+  // before/after direction, both saving immediately on change like the status
+  // dropdown does.
+  function buildGinnasticaAttivaEditHtml(detail) {
+    var slots = Math.abs(detail.ginnasticaAttivaSlots);
+    var isBefore = detail.ginnasticaAttivaSlots < 0;
+
+    return '<div class="slot-detail-ga-row">' +
+      '<b>Ginnastica Attiva:</b> ' +
+      '<input type="number" id="ga-minutes-input" min="0" step="15" value="' + (slots * 15) + '"> min ' +
+      '<select id="ga-direction-select">' +
+        '<option value="after"' + (!isBefore ? ' selected' : '') + '>dopo</option>' +
+        '<option value="before"' + (isBefore ? ' selected' : '') + '>prima</option>' +
+      '</select>' +
+    '</div>';
+  }
+
+  function wireGinnasticaAttivaEdit(slotId) {
+    function save() {
+      var minutes = parseInt($('#ga-minutes-input').val(), 10) || 0;
+      var roundedMinutes = Math.max(0, Math.round(minutes / 15) * 15);
+      var durationSlots = roundedMinutes / 15;
+      var isBefore = $('#ga-direction-select').val() === 'before';
+
+      $.ajax({
+        url: 'Giorno/Slot/' + slotId + '/SetGinnasticaAttiva',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ durationSlots: durationSlots, isBefore: isBefore })
+      }).fail(function(jqXHR) {
+        var msg = (jqXHR.responseJSON && jqXHR.responseJSON.message) ? jqXHR.responseJSON.message : 'Operazione non riuscita.';
+        window.showModal('<p>' + msg + '</p>', [{ label: 'Chiudi', className: 'secondary', onClick: function() {} }]);
+      });
+    }
+
+    $('#modal-body #ga-minutes-input').on('change', save);
+    $('#modal-body #ga-direction-select').on('change', save);
   }
 
   var slotStatusLabels = { 0: 'Da fare', 1: 'Fatto', 2: 'Assente' };
@@ -2314,6 +2549,7 @@ $(function() {
 
       window.showModal('', [{ label: 'Annulla', className: 'secondary', onClick: function() { showSlotDetailPopup(detail.id); } }]);
       $('#modal-body').empty().append($body);
+      wireSlotDetailPatientClick();
     });
   }
 
@@ -2423,8 +2659,19 @@ $(function() {
   // to shrink/grow rows so a whole day always fits on one A4 page regardless of how
   // many 15-minute slots it has.
   function buildScheduleGridTable(columns, gridStart, gridEnd, capacityWarningThreshold, labelFn, rowHeightPx) {
+    // Stampa (print) passes an explicit, dynamically-computed rowHeightPx to fit
+    // the physical page - that case still needs the inline style, since a fixed
+    // CSS class can't vary per print job. Normal on-screen Settimana never passes
+    // one, so it's free to use a CSS class instead (CPU: stop hardcoding cell
+    // height in JS).
+    var isExplicitHeight = !!rowHeightPx;
     rowHeightPx = rowHeightPx || PIANIFICAZIONE_ROW_HEIGHT;
     var rowCount = gridEnd - gridStart;
+    // Giorno passes a single column, Settimana passes one per weekday - used to
+    // scope the new fixed-height CSS classes to Giorno only (CPU's call:
+    // Presenze + Giorno share these, Settimana keeps its own separate,
+    // still-TBD rules and its old inline-pixel height).
+    var isSingleDay = columns.length === 1;
 
     var $wrapper = $('<div class="scheduling-view pianificazione-wrapper"></div>');
     var $table = $('<table class="scheduling-grid pianificazione-grid"></table>');
@@ -2473,7 +2720,9 @@ $(function() {
     for (var row = 0; row < rowCount; row++) {
       var slotVal = gridStart + row;
       var $row = $('<tr></tr>');
-      $row.append('<td class="scheduling-time-cell" style="height:' + rowHeightPx + 'px">' + slotToTime(slotVal) + '</td>');
+      var timeCellClass = isSingleDay ? 'scheduling-time-cell presenze-giorno-cell' : 'scheduling-time-cell' + (isExplicitHeight ? '' : ' settimana-cell');
+      var timeCellStyle = (!isSingleDay && isExplicitHeight) ? ' style="height:' + rowHeightPx + 'px"' : '';
+      $row.append('<td class="' + timeCellClass + '"' + timeCellStyle + '>' + slotToTime(slotVal) + '</td>');
 
       columns.forEach(function(col, c) {
         var cd = colData[c];
@@ -2490,7 +2739,11 @@ $(function() {
         var overlayClass = overlayInfo.type === 'vacation' ? ' vacation-overlay' :
           (overlayInfo.type === 'unavailable' ? ' availability-overlay' : '');
 
-        var $td = $('<td class="giorno-settimana-cell ' + capacityClass + overlayClass + '" style="height:' + rowHeightPx + 'px"></td>');
+        var $td = isSingleDay
+          ? $('<td class="giorno-settimana-cell presenze-giorno-cell ' + capacityClass + overlayClass + '"></td>')
+          : (isExplicitHeight
+            ? $('<td class="giorno-settimana-cell ' + capacityClass + overlayClass + '" style="height:' + rowHeightPx + 'px"></td>')
+            : $('<td class="giorno-settimana-cell settimana-cell ' + capacityClass + overlayClass + '"></td>'));
 
         if (overlayInfo.type === 'vacation' && isRunStart) {
           $td.append('<span class="giorno-vacation-label">' + overlayInfo.label + '</span>');
@@ -2623,16 +2876,24 @@ $(function() {
         var $overlay = $('<div class="' + overlayClass + '" title="' + item.label + '"><span class="pianificazione-cell-label">' + item.label + '</span></div>');
         $overlay.css({
           top: '0',
-          height: (span * rowHeightPx - 1) + 'px',
-          left: 'calc((100% - 2em) * ' + idx + ' / ' + groupSize + ')',
-          width: 'calc((100% - 2em) / ' + groupSize + ')'
+          '--group-index': idx,
+          '--group-count': groupSize
         });
+
+        if (isSingleDay) {
+          var spanClamped = Math.max(1, Math.min(4, span));
+          $overlay.addClass('pianificazione-session-overlay-span-' + spanClamped);
+        } else if (isExplicitHeight) {
+          $overlay.css('height', (span * rowHeightPx - 1) + 'px');
+        } else {
+          var settimanaSpanClamped = Math.max(1, Math.min(4, span));
+          $overlay.addClass('pianificazione-session-overlay-settimana-span-' + settimanaSpanClamped);
+        }
 
         if (item.isReparto) {
           var hex = intToHexColor(item.color);
           $overlay.css({
-            background: hex,
-            border: '1px solid ' + halfBrightnessHex(hex)
+            background: hex
           });
         }
 
@@ -2782,6 +3043,11 @@ $(function() {
       settimanaCurrentWeekStart = getMondayOfWeek(new Date());
     }
 
+    if (!settimanaMode && !settimanaSelectedTherapistId && currentSession && !currentSession.isAccettazione) {
+      settimanaMode = 'therapist';
+      settimanaSelectedTherapistId = currentSession.id;
+    }
+
     loadSchedulingTherapists(function() {
       buildSettimanaView();
     });
@@ -2807,6 +3073,7 @@ $(function() {
     if (currentSession && currentSession.isAccettazione) {
       setupEdgeOverlays(function(side) {
         settimanaCurrentWeekStart = addDays(settimanaCurrentWeekStart, side === 'left' ? -7 : 7);
+        syncSchedulingDates('settimana');
         buildSettimanaView();
       });
     }
@@ -3057,6 +3324,67 @@ $(function() {
 
   // --- Piano (patient plan) ----------------------------------------------------
   //
+  // Quick-glance page (CPU's call): name, phone, current therapy, sessions
+  // remaining, next 3 upcoming slots, most recent past slot's done/not-done
+  // status, and a link to the patient's document if there is one. Reachable
+  // via a button next to the patient's name both on the patient page and in
+  // the slot detail popup - both open this same page. Plain in-app back button
+  // (hash history already handles this, same as every other view).
+  function renderPatientStatusView(patientId) {
+    setTopbarActions(null);
+    $('#content').empty().append('<div class="scheduling-empty">Caricamento...</div>');
+
+    $.get('Patients/Status/' + patientId).done(function(data) {
+      var $wrapper = $('<div class="patient-status-wrapper"></div>');
+
+      $wrapper.append($('<h2></h2>').text(data.patientName));
+      $wrapper.append($('<div class="patient-status-phone"></div>').text(formatPhoneDisplay(data.patientPhone)));
+
+      if (data.currentTherapy) {
+        var t = data.currentTherapy;
+        var remaining = (t.parts || []).reduce(function(sum, p) { return sum + Math.max(0, p.remaining); }, 0);
+        $wrapper.append($('<h3></h3>').text('Terapia in corso'));
+        $wrapper.append($('<div></div>').text((t.name || t.statusLabel) + ' - ' + remaining + ' seduta/e rimanenti'));
+      } else {
+        $wrapper.append($('<h3></h3>').text('Terapia in corso'));
+        $wrapper.append('<div class="scheduling-empty">Nessuna terapia in corso.</div>');
+      }
+
+      function buildSlotLine(s) {
+        var dateObj = parseDateISO(s.date);
+        return formatGiornoLabel(dateObj) + ' ' + slotToTime(s.timeSlot) + ' - ' + s.therapyTypeName + ' (' + s.therapistName + ')';
+      }
+
+      $wrapper.append($('<h3></h3>').text('Prossime sedute'));
+      if (data.nextSlots.length === 0) {
+        $wrapper.append('<div class="scheduling-empty">Nessuna seduta pianificata.</div>');
+      } else {
+        var $nextList = $('<ul class="patient-status-list"></ul>');
+        data.nextSlots.forEach(function(s) {
+          $nextList.append($('<li></li>').text(buildSlotLine(s)));
+        });
+        $wrapper.append($nextList);
+      }
+
+      $wrapper.append($('<h3></h3>').text('Ultima seduta'));
+      if (data.lastPastSlot) {
+        $wrapper.append($('<div></div>').text(buildSlotLine(data.lastPastSlot) + ' - ' + data.lastPastSlot.statusLabel));
+      } else {
+        $wrapper.append('<div class="scheduling-empty">Nessuna seduta passata.</div>');
+      }
+
+      if (data.hasDocument) {
+        var $docBtn = $('<button type="button" class="secondary">Vedi documento</button>');
+        $docBtn.on('click', function() {
+          window.open('Patients/Document/' + patientId, '_blank');
+        });
+        $wrapper.append($docBtn);
+      }
+
+      $('#content').empty().append($wrapper);
+    });
+  }
+
   // Reached via the "Genera piano" button on the patient form: every slot of the
   // patient's current therapy (see Patients/PlanData), sorted by date/time. Unlike
   // Giorno/Settimana's Stampa, this is a plain list, not a time grid - so no
@@ -3096,7 +3424,8 @@ $(function() {
         var $row = $('<tr></tr>');
         $row.append($('<td></td>').text(formatPlanDate(slotDate)));
         $row.append($('<td></td>').text(slotToTime(s.timeSlot)));
-        $row.append($('<td></td>').text(s.therapyTypeName));
+        var therapyText = s.therapyTypeName + (s.ginnasticaAttivaLabel ? ' (' + s.ginnasticaAttivaLabel + ')' : '');
+        $row.append($('<td></td>').text(therapyText));
         $row.append($('<td></td>').text(s.therapistName));
         $tbody.append($row);
       });
@@ -3114,11 +3443,13 @@ $(function() {
   function navigateToAlertTarget(view, id, therapistId, date) {
     if (view === 'settimana' && therapistId) {
       settimanaCurrentWeekStart = getMondayOfWeek(parseDateOnly(date));
+      syncSchedulingDates('settimana');
       settimanaMode = 'therapist';
       settimanaSelectedTherapistId = therapistId;
       navigateTo('settimana');
     } else if (view === 'giorno' && therapistId) {
       giornoCurrentDate = parseDateOnly(date);
+      syncSchedulingDates('giorno');
       giornoMode = 'therapist';
       giornoSelectedTherapistId = therapistId;
       navigateTo('giorno');
@@ -5464,7 +5795,7 @@ $(function() {
 
   // --- Pazienti (Patients) ---------------------------------------------------
 
-  var pazientiState = { filter: '', page: 1, sortBy: 'created', sortDir: 'desc' };
+  var pazientiState = { filter: '', page: 1, sortBy: 'created', sortDir: 'desc', soloMieiPazienti: false };
   var pazientiFilterTimeout = null;
 
   // Phone display: 3-digit lead group, then 2-digit groups, with the last group
@@ -5518,6 +5849,19 @@ $(function() {
     var $filterInput = $('<input type="text" class="patients-filter-input" placeholder="Cerca per nome o telefono (min. 3 caratteri)">').val(pazientiState.filter);
     var $filterClear = $('<button type="button" class="patients-filter-clear">×</button>');
     $filterWrap.append($filterInput).append($filterClear);
+
+    if (currentSession && !currentSession.isAccettazione) {
+      var $mieiToggle = $('<label class="patients-miei-toggle"></label>');
+      var $mieiCheckbox = $('<input type="checkbox">').prop('checked', pazientiState.soloMieiPazienti);
+      $mieiCheckbox.on('change', function() {
+        pazientiState.soloMieiPazienti = $mieiCheckbox.is(':checked');
+        pazientiState.page = 1;
+        loadPazientiPage();
+      });
+      $mieiToggle.append($mieiCheckbox).append(' Solo i miei pazienti');
+      $filterWrap.append($mieiToggle);
+    }
+
     $wrapper.append($filterWrap);
 
     var $table = $(
@@ -5571,7 +5915,8 @@ $(function() {
         filter: pazientiState.filter,
         page: pazientiState.page,
         sortBy: pazientiState.sortBy,
-        sortDir: pazientiState.sortDir
+        sortDir: pazientiState.sortDir,
+        soloMieiPazienti: pazientiState.soloMieiPazienti
       }).done(function(result) {
         updateSortIndicators();
 
@@ -5896,7 +6241,7 @@ $(function() {
             var $partsContainer = $('<div class="therapy-parts-editor"></div>');
             $therapyFormArea.append($partsContainer);
 
-            function addPartRow(therapyTypeId, sessionCount) {
+            function addPartRow(therapyTypeId, sessionCount, includeGinnasticaAttiva) {
               var $row = $('<div class="therapy-part-row"></div>');
               var $typeSelect = $('<select class="therapy-part-type"></select>');
 
@@ -5910,26 +6255,43 @@ $(function() {
 
               var $sessionInput = $('<input type="number" class="therapy-part-sessions" min="1" value="' + (sessionCount || 10) + '">');
 
+              var $gaLabel = $('<label class="therapy-part-ga-label"></label>');
+              var $gaCheckbox = $('<input type="checkbox" class="therapy-part-ga">').prop('checked', !!includeGinnasticaAttiva);
+              $gaLabel.append($gaCheckbox).append(' Includi Ginnastica Attiva');
+
+              function refreshGaVisibility() {
+                var selectedType = therapyTypesCache.find(function(t) { return t.id === parseInt($typeSelect.val(), 10); });
+                if (selectedType && selectedType.allowsGinnasticaAttiva) {
+                  $gaLabel.show();
+                } else {
+                  $gaLabel.hide();
+                  $gaCheckbox.prop('checked', false);
+                }
+              }
+
+              $typeSelect.on('change', refreshGaVisibility);
+
               var $removePartBtn = $('<button type="button" class="availability-remove">×</button>');
               $removePartBtn.on('click', function() {
                 $row.remove();
               });
 
-              $row.append($typeSelect).append($sessionInput).append($removePartBtn);
+              $row.append($typeSelect).append($sessionInput).append($gaLabel).append($removePartBtn);
               $partsContainer.append($row);
+              refreshGaVisibility();
             }
 
             if (therapy && therapy.parts.length > 0) {
               therapy.parts.forEach(function(p) {
-                addPartRow(p.therapyTypeId, p.sessionCount);
+                addPartRow(p.therapyTypeId, p.sessionCount, p.defaultGinnasticaAttivaSlots > 0);
               });
             } else {
-              addPartRow(null, 10);
+              addPartRow(null, 10, false);
             }
 
             var $addPartBtn = $('<button type="button" class="availability-add-btn">+ Aggiungi un\'altra parte alla terapia</button>');
             $addPartBtn.on('click', function() {
-              addPartRow(null, 10);
+              addPartRow(null, 10, false);
             });
             $therapyFormArea.append($addPartBtn);
 
@@ -5949,12 +6311,13 @@ $(function() {
               $partsContainer.find('.therapy-part-row').each(function() {
                 var typeId = parseInt($(this).find('.therapy-part-type').val(), 10);
                 var sessions = parseInt($(this).find('.therapy-part-sessions').val(), 10);
+                var includeGA = $(this).find('.therapy-part-ga').is(':checked');
 
                 if (!typeId || !sessions || sessions < 1) {
                   valid = false;
                 }
 
-                parts.push({ therapyTypeId: typeId, sessionCount: sessions });
+                parts.push({ therapyTypeId: typeId, sessionCount: sessions, includeGinnasticaAttiva: includeGA });
               });
 
               if (!valid || parts.length === 0) {
@@ -6156,6 +6519,12 @@ $(function() {
           navigateTo('piano', id);
         });
         $actions.append($plan);
+
+        var $status = $('<button type="button" class="secondary">Stato paziente</button>');
+        $status.on('click', function() {
+          navigateTo('patientStatus', id);
+        });
+        $actions.append($status);
 
         var $remove = $('<button type="button" class="danger">Rimuovi paziente</button>');
         $remove.on('click', function() {
@@ -6359,7 +6728,7 @@ $(function() {
         return $box;
       }
 
-      function addAvailabilitySlot($slotList, startTime, endTime) {
+      function addAvailabilitySlot($slotList, startTime, endTime, overrideOperatingArea) {
         var startSlot = (startTime !== null && startTime !== undefined) ? startTime : timeToSlot('09:00');
         var endSlot = (endTime !== null && endTime !== undefined) ? endTime : timeToSlot('13:00');
 
@@ -6367,6 +6736,20 @@ $(function() {
         var $times = $('<div class="availability-slot-times"></div>');
         var $start = buildTimeBox('availability-start', startSlot);
         var $end = buildTimeBox('availability-end', endSlot);
+
+        // Optional per-window override (CPU's call): pins this specific window to
+        // one pure area, regardless of the therapist's main OperatingArea - e.g.
+        // mostly-Palestra-plus-aiuto in the morning, pure Reparto in the afternoon.
+        var $override = $('<select class="availability-override"></select>');
+        $override.append('<option value="">Normale</option>');
+        $override.append('<option value="0">Solo Palestra</option>');
+        $override.append('<option value="2">Solo Reparto</option>');
+        $override.val(overrideOperatingArea !== null && overrideOperatingArea !== undefined ? String(overrideOperatingArea) : '');
+        $override.on('change', function() {
+          if (dirty) {
+            dirty.refresh();
+          }
+        });
 
         var $remove = $('<button type="button" class="availability-remove">×</button>');
 
@@ -6377,7 +6760,7 @@ $(function() {
           }
         });
 
-        $times.append($start).append($end);
+        $times.append($start).append($end).append($override);
         $slot.append($times).append($remove);
         $slotList.append($slot);
       }
@@ -6394,7 +6777,7 @@ $(function() {
 
           var $addBtn = $('<button type="button" class="availability-add-btn">+</button>');
           $addBtn.on('click', function() {
-            addAvailabilitySlot($slotList, null, null);
+            addAvailabilitySlot($slotList, null, null, null);
             if (dirty) {
               dirty.refresh();
             }
@@ -6411,7 +6794,7 @@ $(function() {
           data.availability.forEach(function(slot) {
             var $slotList = dayColumns[slot.dayOfWeek];
             if ($slotList) {
-              addAvailabilitySlot($slotList, slot.startTime, slot.endTime);
+              addAvailabilitySlot($slotList, slot.startTime, slot.endTime, slot.overrideOperatingArea);
             }
           });
         }
@@ -6515,10 +6898,12 @@ $(function() {
           $availabilityColumns.find('.availability-column').each(function() {
             var day = parseInt($(this).data('day'), 10);
             $(this).find('.availability-slot').each(function() {
+              var overrideVal = $(this).find('.availability-override').val();
               availability.push({
                 dayOfWeek: day,
                 startTime: $(this).find('.availability-start').data('slot'),
-                endTime: $(this).find('.availability-end').data('slot')
+                endTime: $(this).find('.availability-end').data('slot'),
+                overrideOperatingArea: overrideVal === '' ? null : parseInt(overrideVal, 10)
               });
             });
           });
@@ -7387,7 +7772,7 @@ $(function() {
 
       var $table = $(
         '<table class="data-table"><thead><tr>' +
-        '<th>Nome</th><th>Approvatore</th><th>Paziente</th><th>Terapie</th><th>Prezzo finale</th><th>Data creazione</th>' +
+        '<th>Nome</th><th>Approvatore</th><th>Paziente</th><th>Terapie</th><th>Prezzo nominale</th><th>Prezzo finale</th><th>Data creazione</th>' +
         (showAudit ? '<th>Modificatore</th><th>Data Modifica</th>' : '') +
         '</tr></thead><tbody></tbody></table>'
       );
@@ -7399,19 +7784,26 @@ $(function() {
 
         $row.append($('<td></td>').text(p.name));
         $row.append($('<td></td>').text(p.approvatore || ''));
-        $row.append($('<td></td>').text(p.patientName));
+        $row.append($('<td></td>').text(p.patientName || ''));
         $row.append($('<td></td>').text(p.itemsSummary));
+        $row.append($('<td></td>').text(p.nominalPrice != null ? formatCurrency(p.nominalPrice) : ''));
         $row.append($('<td></td>').text(formatCurrency(p.totalPrice)));
-        $row.append($('<td></td>').text(formatDate(p.createdAt)));
+        $row.append($('<td></td>').text(p.createdAt ? formatDate(p.createdAt) : ''));
 
         if (showAudit) {
           $row.append($('<td></td>').text(p.modifier || ''));
-          $row.append($('<td></td>').text(formatDate(p.modDate)));
+          $row.append($('<td></td>').text(p.modDate ? formatDate(p.modDate) : ''));
         }
 
-        $row.on('click', function() {
-          navigateTo('pacchetti', p.id);
-        });
+        // Therapy-type rows are purely informational (CPU's call) - nothing to
+        // open, so no click-through.
+        if (!p.isTherapyType) {
+          $row.on('click', function() {
+            navigateTo('pacchetti', p.id);
+          });
+        } else {
+          $row.addClass('pacchetti-therapy-type-row');
+        }
 
         $tbody.append($row);
       });
@@ -7457,6 +7849,7 @@ $(function() {
     setTopbarActions($chiudiBtn);
 
     pacchettoConfigCache = null;
+    therapyTypesCache = null;
 
     loadPacchettoConfig(function() {
       loadTherapyTypes(function() {
@@ -7522,6 +7915,7 @@ $(function() {
 
     function buildForm(data) {
       pacchettoConfigCache = null; // always fetch fresh - the rate card may have changed since it was last loaded
+      therapyTypesCache = null; // same reasoning - a type added elsewhere this session shouldn't be missing here
       loadTherapyTypes(function() {
         loadPacchettoConfig(function() {
           var $form = $('<div class="form-box"></div>');

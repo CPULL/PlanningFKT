@@ -643,9 +643,12 @@ public partial class AppController {
       }
     }
 
+    var newHeavySlots = new List<TherapySlot>();
     foreach (var placement in request.Placements) {
       foreach (var seg in placement.HeavySegments) {
-        _db.TherapySlots.Add(BuildTherapySlot(seg.PartId, placement.Date, seg.TimeSlot, seg.TherapistId));
+        var newSlot = BuildTherapySlot(seg.PartId, placement.Date, seg.TimeSlot, seg.TherapistId);
+        newHeavySlots.Add(newSlot);
+        _db.TherapySlots.Add(newSlot);
       }
       foreach (var seg in placement.LightSegments) {
         _db.TherapySlots.Add(BuildTherapySlot(seg.PartId, placement.Date, seg.TimeSlot, null));
@@ -653,6 +656,13 @@ public partial class AppController {
     }
 
     therapy.Status = TherapyStatus.Scheduled;
+    _db.SaveChanges();
+
+    // Only Heavy segments can be Rieducazione Motoria/Isocinetica - Light
+    // (Reparto) segments never carry Ginnastica Attiva.
+    foreach (var newSlot in newHeavySlots) {
+      AutoPlaceGinnasticaAttiva(newSlot);
+    }
     _db.SaveChanges();
 
     return Ok();

@@ -212,6 +212,11 @@ body {
 .topbar-fallback-title {
   font-size: 16px;
   font-weight: bold;
+  margin-left: 1em;
+}
+
+.scheduling-header select {
+  font-size: 16px;
 }
 
 .content {
@@ -337,6 +342,15 @@ body {
 
 .data-table tbody tr:hover {
   background: #f4f4f4;
+}
+
+.pacchetti-therapy-type-row {
+  cursor: default;
+  color: #666;
+}
+
+.data-table tbody tr.pacchetti-therapy-type-row:hover {
+  background: none;
 }
 
 .data-table tr.removed-row {
@@ -838,9 +852,42 @@ body {
   margin-bottom: 10px;
 }
 
-.slot-detail-patient {
-  font-size: 16px;
+.slot-detail-patient-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 4px;
+}
+
+.slot-detail-patient-link {
+  font-weight: bold;
+  font-size: 24px;
+  text-decoration: underline;
+  color: #266e5a;
+  cursor: pointer;
+}
+
+.slot-detail-patient-link:hover {
+  color: #1a4d40;
+}
+
+.slot-detail-ga-row {
+  margin: 8px 0;
+}
+
+.patient-status-wrapper {
+  padding: 20px;
+  max-width: 700px;
+}
+
+.patient-status-phone {
+  color: #555;
+  margin-bottom: 16px;
+}
+
+.patient-status-list {
+  margin: 0;
+  padding-left: 20px;
 }
 
 .slot-detail-therapist {
@@ -1012,7 +1059,8 @@ body {
 
 .scheduling-date-label {
   font-weight: bold;
-  min-width: 140px;
+  min-width: 90px;
+  font-size: 16px;
   text-align: center;
 }
 
@@ -1296,6 +1344,51 @@ body {
   z-index: 2;
   cursor: pointer;
   text-align: left;
+  border: 1px solid #01a;
+  border-left: 3px solid #517;
+  /* JS sets --group-index/--group-count only - the gap itself lives here so
+     N/L/P can vary or drop it independently (CPU: can't compute this in JS
+     without knowing the active orientation). */
+  --overlay-gap: 2em;
+  left: calc((100% - var(--overlay-gap)) * var(--group-index, 0) / var(--group-count, 1));
+  width: calc((100% - var(--overlay-gap)) / var(--group-count, 1));
+}
+
+/* Presenze + Giorno only (CPU's call - Settimana keeps its own separate, still-
+   TBD rules and its old inline-pixel height). Replaces the old JS-computed
+   `span * rowHeightPx - 1` inline height so N/L/P can each redefine it. Audit
+   mode only ever applies in N (CPU's call), hence no L/P -audit variants. */
+.pianificazione-session-overlay-span-1 { height: 31px; }
+.pianificazione-session-overlay-span-2 { height: 63px; }
+.pianificazione-session-overlay-span-3 { height: 95px; }
+.pianificazione-session-overlay-span-4 { height: 127px; }
+
+.pianificazione-session-overlay-span-1-audit { height: 63px; }
+.pianificazione-session-overlay-span-2-audit { height: 127px; }
+.pianificazione-session-overlay-span-3-audit { height: 191px; }
+.pianificazione-session-overlay-span-4-audit { height: 255px; }
+
+/* Shared fixed row height for Presenze + Giorno cells (CPU's call: 32px,
+   replacing the old JS-computed inline height). Settimana is NOT covered by
+   this class - it keeps its own separate rules. */
+/* Settimana's own overlay heights (screen only - print keeps its dynamic inline
+   value). Same 24px-per-slot math as before, just moved out of inline JS -
+   still TBD per CPU, will get its own L/P rules separately. */
+.pianificazione-session-overlay-settimana-span-1 { height: 23px; }
+.pianificazione-session-overlay-settimana-span-2 { height: 47px; }
+.pianificazione-session-overlay-settimana-span-3 { height: 71px; }
+.pianificazione-session-overlay-settimana-span-4 { height: 95px; }
+
+.pianificazione-grid td.presenze-giorno-cell {
+  height: 32px;
+}
+
+/* Settimana's own row height (screen only - Stampa/print still passes an
+   explicit dynamic value via inline style, since a fixed class can't vary per
+   print job). Same 24px value as before, just moved out of inline JS - still
+   TBD per CPU, will get its own L/P rules separately from Presenze/Giorno. */
+.settimana-cell {
+  height: 24px;
 }
 
 .pianificazione-occupied-other {
@@ -1306,6 +1399,8 @@ body {
 .pianificazione-occupied-same {
   background: #b2ebf2;
   color: #00646d;
+  border: 1px solid #01a;
+  border-left: 3px solid #517;
 }
 
 .pianificazione-draft {
@@ -1452,7 +1547,7 @@ body {
   position: absolute;
   left: 4px;
   top: 2px;
-  font-size: 10px;
+  font-size: 42px;
   font-weight: bold;
   color: #a13a3a;
   z-index: 1;
@@ -1487,98 +1582,16 @@ body {
   background: linear-gradient(270deg, rgba(12, 68, 237, 1) 0%, rgba(7, 238, 242, 0.1) 100%);
 }
 
-/* Narrow landscape screens crowd the topbar action buttons - step the font size
-   down in two stages (portrait/tablet is unaffected, buttons just wrap there).
-   The logo/title icon is dropped entirely at the same first breakpoint to free
-   up room, since it's decorative and not needed once space is tight.
-   These blocks are placed at the very end of the file on purpose: every selector
-   here (.topbar button, .scheduling-date-label, .pianificazione-rimpiazza-row,
-   etc.) also has an unconditional base rule elsewhere with equal specificity -
-   with equal specificity the LAST rule in source order wins regardless of the
-   media query, so these have to stay last or the base rule silently overrides
-   them even while the media condition is true. */
-@media (max-width: 1400px) and (orientation: landscape) {
-  .topbar {
-    padding: 0;
-  }
+/* Three responsive tiers (CPU's naming): N = normal/base rules (no media
+   query, defined inline with each selector elsewhere in this file), L = max
+   1300px landscape, P = portrait. Being rebuilt selector by selector as CPU
+   confirms real values against the actual tablets - not yet complete.
+   These blocks are placed at the very end of the file on purpose: several
+   selectors here also have an unconditional base rule elsewhere with equal
+   specificity - with equal specificity the LAST rule in source order wins
+   regardless of the media query, so L/P have to stay last or the base rule
+   silently overrides them even while the media condition is true. */
 
-  .topbar-left {
-    gap: 8px;
-  }
-
-  .scheduling-header {
-    gap: 8px;
-  }
-
-  .topbar button {
-    font-size: 14px;
-  }
-
-  .topbar button.scheduling-nav-btn {
-    font-size: 20px;
-  }
-
-  .scheduling-date-label {
-    min-width: 90px;
-  }
-
-  .scheduling-header select {
-    font-size: 10px;
-  }
-
-  .pianificazione-rimpiazza-row {
-    font-size: 10px;
-  }
-
-  .topbar-fallback-icon {
-    display: none;
-  }
-}
-
-@media (max-width: 1100px) and (orientation: landscape) {
-  .topbar {
-    padding: 0;
-  }
-
-  .topbar-left {
-    gap: 8px;
-  }
-
-  .scheduling-header {
-    gap: 8px;
-  }
-
-  .topbar button {
-    font-size: 10px;
-  }
-
-  .topbar button.scheduling-nav-btn {
-    font-size: 16px;
-  }
-
-  .scheduling-date-label {
-    min-width: 70px;
-  }
-
-  .scheduling-header select {
-    font-size: 10px;
-  }
-
-  .pianificazione-rimpiazza-row {
-    font-size: 10px;
-  }
-}
-
-/* Stampa (print preview) - printed output only, screen appearance is untouched.
-   Reached only via the Giorno/Settimana print button, so this only ever needs to
-   cover the Giorno/Settimana grid's own classes, not every class in the app.
-   Orientation (portrait for Giorno, landscape for Settimana) is set per print job by
-   JS (setStampaPageOrientation), since @page can't be conditionally scoped by a class -
-   no "size" here on purpose.
-   margin:0 here (instead of a normal page margin) is a common trick to suppress the
-   browser's own print header/footer (date, page title/URL, page number) - Chrome/Edge
-   drop those once the page has no margin to put them in. The visual margin readers
-   still need is added back as ordinary .content padding below instead. */
 @media print {
   @page {
     margin: 0;
@@ -2017,16 +2030,35 @@ body {
 
 .foglio-firma-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   margin-bottom: 20px;
 }
 
 .foglio-firma-cell {
+  position: relative;
   border: 1px solid #a0b0fd;
   border-radius: 4px;
   padding: 6px 10px;
   cursor: pointer;
+}
+
+.foglio-firma-checkbox {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  cursor: pointer;
+}
+
+.foglio-firma-cell-fatto {
+  opacity: 0.45;
+}
+
+.foglio-firma-tutto-fatto {
+  font-size: 40px;
+  color: #266e5a;
+  text-align: center;
+  margin: 20px 0;
 }
 
 .foglio-firma-cell:hover {
@@ -2036,7 +2068,7 @@ body {
 
 .foglio-firma-cell-name {
   font-weight: bold;
-  font-size: 28px;
+  font-size: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2063,4 +2095,338 @@ body {
 
 .therapy-foglio-firma-label {
   font-weight: 500;
+}
+
+.patients-miei-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+
+@media (max-width: 1300px) and (orientation: landscape) {
+  .giorno-vacation-label {
+    font-size: 42px;
+  }
+
+  .topbar {
+    padding: 0;
+  }
+
+  .topbar-left {
+    gap: 8px;
+  }
+
+  .scheduling-header {
+    gap: 8px;
+  }
+
+  .topbar-fallback-icon {
+    display: none;
+  }
+
+  .topbar-fallback-title {
+    margin-left: 0.5em;
+  }
+
+  .topbar button {
+    font-size: 14px;
+  }
+
+  .topbar button.scheduling-nav-btn {
+    font-size: 20px;
+  }
+
+  .pianificazione-rimpiazza-row {
+    font-size: 10px;
+  }
+}
+
+@media (orientation: portrait) {
+  .foglio-firma-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .foglio-firma-cell-name {
+    font-weight: bold;
+    font-size: 20px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .foglio-firma-cell-therapies,
+  .foglio-firma-cell-date {
+    font-size: 12px;
+    color: #555;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    float: right;
+  }
+
+  .pianificazione-reparto-count {
+    display: none;
+  }
+
+  /* Bumps every un-styled modal element by ~10px via inheritance (default body
+     text is ~16px) - the slot-detail-* classes and quick-date-picker already
+     have their own explicit P overrides, so this doesn't touch those. CPU:
+     "all items inside the modal body need a bigger font size... increase all
+     by 10 unless already done." .therapist-halfday-row is deliberately left
+     alone - it's a dense mini-schedule, and +10 there would make it unreadable/
+     overflow rather than just bigger; flagging this as an exception rather than
+     applying the rule mechanically. */
+  #modal-body {
+    font-size: 26px;
+  }
+
+  .modal-body input {
+    font-size: 24px;
+  }
+
+  .modal-error {
+    font-size: 23px;
+  }
+
+  .pianificazione-session-overlay {
+    --overlay-gap: 0;
+  }
+
+  .pianificazione-session-overlay-settimana-span-1 { height: 33px; }
+  .pianificazione-session-overlay-settimana-span-2 { height: 70px; }
+  .pianificazione-session-overlay-settimana-span-3 { height: 111px; }
+  .pianificazione-session-overlay-settimana-span-4 { height: 148px; }
+
+  .giorno-vacation-label {
+    position: absolute;
+    left: 4px;
+    top: 2px;
+    font-size: 42px;
+    font-weight: bold;
+    color: #a13a3a;
+    z-index: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 2em);
+  }
+
+  .slot-detail-therapy-name {
+    font-weight: bold;
+    font-size: 32px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+
+  .slot-detail-datetime {
+    color: #555;
+    margin-bottom: 10px;
+    font-size: 30px;
+  }
+
+  .slot-detail-patient-link {
+    display: block;
+    font-weight: bold;
+    font-size: 32px;
+    text-decoration: underline;
+    color: #266e5a;
+    margin-bottom: 4px;
+    cursor: pointer;
+  }
+
+  .slot-detail-therapist {
+    color: #555;
+    font-size: 30px;
+    margin: 1em 0;
+  }
+
+  .slot-detail-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    font-size: 32px;
+  }
+
+  .slot-detail-status-row select {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 32px;
+  }
+
+  .quick-date-picker-cell {
+    height: 40px;
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    font-size: 24px;
+  }
+
+  .mese-table th {
+    text-align: center;
+    border: 2px solid #888;
+    padding: 6px;
+    font-size: 24px;
+  }
+
+  .quick-date-picker-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    font-weight: bold;
+    font-size: 32px;
+  }
+
+  .modal {
+    width: 75vw;
+    height: 66.6667vh;
+    background: #fff;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modal-actions button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #266e5a;
+    color: #fff;
+    font-size: 32px;
+  }
+
+  .pianificazione-grid td.presenze-giorno-cell {
+    height: 32px;
+  }
+
+  .topbar-fallback-icon {
+    display: none;
+  }
+
+  .topbar-fallback-title {
+    margin-left: 0.5em;
+  }
+
+  .topbar button {
+    font-size: 14px;
+  }
+
+  .topbar button.scheduling-nav-btn {
+    font-size: 20px;
+  }
+
+  .sidebar-nav button {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    color: #cfd8dc;
+    text-align: left;
+    padding: 24px 10px;
+    font-size: 24px;
+    cursor: pointer;
+  }
+
+  .sidebar {
+    width: 130px;
+    background: #1f2a6e;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .account-menu {
+    position: absolute;
+    left: 2px;
+    top: 22em;
+  }
+
+  .account-menu .topbar button {
+    font-size: 20px;
+  }
+
+  button.account-menu-button {
+    font-size: 18px;
+  }
+
+  .account-menu-dropdown {
+    position: relative;
+    top: 100%;
+    right: 0;
+    min-width: 250px;
+    z-index: 500;
+    margin-top: 4px;
+    margin-left: 10px;
+    background-color: #265a8e;
+    border-radius: 8px;
+    padding: 12px 8px;
+  }
+
+  .welcome-box {
+    background: #fff;
+    border-radius: 10px;
+    padding: 40px 50px;
+    text-align: center;
+    max-width: 75vw;
+  }
+
+  .HelloButtons {
+    padding: 8px 14px;
+    border: none;
+    border-radius: 1em;
+    background: #265a8e;
+    color: #fff;
+    cursor: pointer;
+    border-bottom: 1px solid #367aae;
+    font-size: 28px;
+  }
+
+  .scheduling-grid th,
+  .scheduling-grid td {
+    border: 1px solid #8da7f1;
+    padding: 4px 8px;
+    font-size: 20px;
+    text-align: center;
+  }
+
+  .pianificazione-session-overlay {
+    position: absolute;
+    box-sizing: border-box;
+    overflow: hidden;
+    border-radius: 4px;
+    padding: 1px 3px;
+    font-size: 20px;
+    z-index: 2;
+    text-align: left;
+    font-weight: bold;
+  }
+
+  .pianificazione-grid th,
+  .pianificazione-grid td {
+    box-sizing: border-box;
+    padding: 0;
+    height: 38px;
+  }
+
+  .pianificazione-grid th:first-child {
+    width: 3em;
+  }
+
+  .pianificazione-grid .scheduling-time-cell {
+    padding: 0 8px;
+    font-size: 16px;
+  }
 }

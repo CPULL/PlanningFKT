@@ -49,6 +49,7 @@ public partial class AppController {
       t.MaxParallelMale,
       t.MaxParallelFemale,
       t.TherapyWeeklyFrequency,
+      allowsGinnasticaAttiva = t.AllowsGinnasticaAttiva != 0,
       isActive = t.IsActive == 1,
       modDate = includeAudit ? t.ModDate : (DateTime?)null,
       modifier = includeAudit && modifierNames.ContainsKey(t.ModUser) ? modifierNames[t.ModUser] : null

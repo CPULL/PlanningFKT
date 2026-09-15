@@ -581,6 +581,7 @@ public partial class AppController {
   private class SlotDetailDto {
     public int Id { get; set; }
     public int? TherapyId { get; set; }
+    public int? PatientId { get; set; }
     public string PatientName { get; set; } = "?";
     public string TherapyTypeName { get; set; } = "?";
     public int? TherapyTypeColor { get; set; }
@@ -591,6 +592,11 @@ public partial class AppController {
     public int TimeSlot { get; set; }
     public int DurationSlots { get; set; }
     public int Status { get; set; }
+    // Only meaningful when the TherapyType allows Ginnastica Attiva - null
+    // means "this type doesn't support it at all" (hide the UI entirely),
+    // 0 means "supported but not attached to this slot."
+    public bool AllowsGinnasticaAttiva { get; set; }
+    public int GinnasticaAttivaSlots { get; set; }
   }
 
   [HttpGet("/Giorno/Slot/{id}")]
@@ -607,11 +613,11 @@ public partial class AppController {
       return NotFound();
     }
 
-    var isAdmin = IsCurrentUserAccettazione();
-
-    if (!isAdmin && slot.TherapistId != currentTherapistId) {
-      return Forbid();
-    }
+    // Any authenticated user can VIEW any slot's details and jump to the
+    // patient - only the modify actions (reassign/status/delete) stay
+    // restricted to admin or the assigned therapist, enforced client-side and
+    // on each of those endpoints individually (CPU: a therapist "should be able
+    // to see the details and also jump to the client").
 
     var part = _db.TherapyParts.Find(slot.TherapyPartId);
     var type = part != null ? _db.TherapyTypes.Find(part.TherapyTypeId) : null;
@@ -622,6 +628,7 @@ public partial class AppController {
     return Ok(new SlotDetailDto {
       Id = slot.Id,
       TherapyId = therapy?.Id,
+      PatientId = therapy?.PatientId,
       PatientName = patient?.Name ?? "?",
       TherapyTypeName = type?.Name ?? "?",
       TherapyTypeColor = type?.Color,
@@ -631,7 +638,9 @@ public partial class AppController {
       Date = slot.Date,
       TimeSlot = slot.TimeSlot,
       DurationSlots = type != null ? GetSpanSlots(type) : 1,
-      Status = slot.Status
+      Status = slot.Status,
+      AllowsGinnasticaAttiva = type != null && type.AllowsGinnasticaAttiva != 0,
+      GinnasticaAttivaSlots = slot.GinnasticaAttivaSlots
     });
   }
 
@@ -830,12 +839,19 @@ public partial class AppController {
       // Same category-match rules as GetPalestraDropdownTherapists /
       // GetRepartoCapableAndCoveringTherapists: pure-Reparto (2) is Reparto-only,
       // everyone else (0/4/6) can do Palestra; Reparto needs the Reparto bit or
-      // the "aiuto" bit.
-      var isReparto = (t.OperatingArea & TherapistOperatingArea.Reparto) != 0;
-      var helpsOtherArea = (t.OperatingArea & TherapistOperatingArea.HelpsOtherArea) != 0;
-      var categoryMatches = type.Category == TherapyCategory.Palestra
-        ? t.OperatingArea != TherapistOperatingArea.Reparto
-        : isReparto || helpsOtherArea;
+      // the "aiuto" bit. Evaluated against the EFFECTIVE area at a given moment
+      // (CPU's call: a per-window override can pin part of the day to a single
+      // pure area, different from the therapist's main OperatingArea).
+      bool CategoryMatchesAt(int effectiveArea) {
+        var effIsReparto = (effectiveArea & TherapistOperatingArea.Reparto) != 0;
+        var effHelpsOtherArea = (effectiveArea & TherapistOperatingArea.HelpsOtherArea) != 0;
+        return type.Category == TherapyCategory.Palestra
+          ? effectiveArea != TherapistOperatingArea.Reparto
+          : effIsReparto || effHelpsOtherArea;
+      }
+
+      var effectiveAreaNow = GetEffectiveOperatingArea(t, slot.Date, slot.TimeSlot);
+      var categoryMatches = CategoryMatchesAt(effectiveAreaNow);
 
       if (!categoryMatches) {
         var mismatchReason = type.Category == TherapyCategory.Palestra ? "Non fa palestra" : "Non fa reparto";
@@ -865,6 +881,9 @@ public partial class AppController {
       // elsewhere in the half-day - CPU's call.
       var hasOtherFreeSlot = false;
       for (var s = halfStart; s + span <= halfEnd; s++) {
+        if (!CategoryMatchesAt(GetEffectiveOperatingArea(t, slot.Date, s))) {
+          continue;
+        }
         if (IsWithinDeclaredAvailability(t.Id, slot.Date, s, span)
             && !IsBlockedByVacation(t.Id, slot.Date, s, span)
             && !HasTherapistConflict(t.Id, slot.Date, s, span)) {
@@ -1127,6 +1146,58 @@ public partial class AppController {
     RecomputeTherapyCompletion(slot.TherapyPartId);
 
     return Ok();
+  }
+
+  public class GiornoSlotSetGinnasticaAttivaRequest {
+    // Duration in 15-min slots (0 = remove); sign is carried separately via
+    // IsBefore so the frontend UI can stay a plain duration + before/after
+    // toggle rather than asking the person to think in signed numbers.
+    public int DurationSlots { get; set; }
+    public bool IsBefore { get; set; }
+  }
+
+  // Manual override for Ginnastica Attiva - both Accettazione and the assigned
+  // therapist can change it at any time (CPU's call), same permission shape as
+  // ChangeStatus. Only valid for a slot whose TherapyType actually allows GA.
+  [HttpPost("/Giorno/Slot/{id}/SetGinnasticaAttiva")]
+  public IActionResult GiornoSlotSetGinnasticaAttiva(int id, [FromBody] GiornoSlotSetGinnasticaAttivaRequest request) {
+    var currentTherapistId = GetCurrentTherapistId();
+
+    if (currentTherapistId == null) {
+      return Forbid();
+    }
+
+    var slot = _db.TherapySlots.Find(id);
+
+    if (slot == null) {
+      return NotFound();
+    }
+
+    var isAdmin = IsCurrentUserAccettazione();
+    var isAssignedTherapist = !isAdmin && slot.TherapistId == currentTherapistId;
+
+    if (!isAdmin && !isAssignedTherapist) {
+      return Forbid();
+    }
+
+    var part = _db.TherapyParts.Find(slot.TherapyPartId);
+    var type = part != null ? _db.TherapyTypes.Find(part.TherapyTypeId) : null;
+
+    if (type == null || type.AllowsGinnasticaAttiva == 0) {
+      return BadRequest(new { message = "Questo tipo di terapia non prevede Ginnastica Attiva." });
+    }
+
+    if (request.DurationSlots < 0) {
+      return BadRequest();
+    }
+
+    slot.GinnasticaAttivaSlots = request.DurationSlots == 0
+      ? 0
+      : (request.IsBefore ? -request.DurationSlots : request.DurationSlots);
+
+    _db.SaveChanges();
+
+    return Ok(new { ginnasticaAttivaSlots = slot.GinnasticaAttivaSlots });
   }
 
   public class GiornoSlotMoveRequest {

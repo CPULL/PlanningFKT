@@ -7,6 +7,7 @@ public partial class AppController {
   public class TherapyPartRequest {
     public int TherapyTypeId { get; set; }
     public int SessionCount { get; set; }
+    public bool IncludeGinnasticaAttiva { get; set; }
   }
 
   public class TherapySaveRequest {
@@ -76,10 +77,14 @@ public partial class AppController {
     _db.SaveChanges();
 
     foreach (var part in request.Parts) {
+      var type = _db.TherapyTypes.Find(part.TherapyTypeId);
+      var allowsGA = type != null && type.AllowsGinnasticaAttiva != 0;
+
       _db.TherapyParts.Add(new TherapyPart {
         TherapyId = therapy.Id,
         TherapyTypeId = part.TherapyTypeId,
         SessionCount = part.SessionCount,
+        DefaultGinnasticaAttivaSlots = (allowsGA && part.IncludeGinnasticaAttiva) ? 1 : 0,
         ModDate = DateTime.Now,
         ModUser = currentUserId.Value
       });
@@ -128,10 +133,14 @@ public partial class AppController {
     _db.TherapyParts.RemoveRange(existingParts);
 
     foreach (var part in request.Parts) {
+      var type = _db.TherapyTypes.Find(part.TherapyTypeId);
+      var allowsGA = type != null && type.AllowsGinnasticaAttiva != 0;
+
       _db.TherapyParts.Add(new TherapyPart {
         TherapyId = id,
         TherapyTypeId = part.TherapyTypeId,
         SessionCount = part.SessionCount,
+        DefaultGinnasticaAttivaSlots = (allowsGA && part.IncludeGinnasticaAttiva) ? 1 : 0,
         ModDate = DateTime.Now,
         ModUser = currentUserId.Value
       });

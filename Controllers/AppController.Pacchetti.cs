@@ -51,14 +51,21 @@ public partial class AppController {
     public decimal PacketCost { get; set; }
   }
 
-  // Mirrors the original spreadsheet/Dart pricing logic exactly (per CPU's uploaded
-  // reference), NOT the earlier 2%-per-line-count approach it replaces:
-  // - totalNormal = Sum(price * qty), rounded (display only)
-  // - totalDiscounted = Sum(price * qty * (1 - rowDiscount)), rounded (display only)
-  // - qtyCapped = min(10, Sum(qty)) - driven by total SESSIONS, not line count
-  // - scontoCalcolato = linear interpolation of scontoMin..scontoMax over 1..10 qty
-  // - packetCost = round-to-5(totalDiscountedRAW * (1 - scontoCalcolato)) - computed
-  //   from the UNROUNDED discounted total, not the rounded display value
+  // Corrected per CPU's clarification (caught before production): the extra
+  // volume discount is based on how many DISTINCT therapies (numT = line
+  // count) are bundled together, NOT total sessions. A packet with a single
+  // therapy gets ONLY that line's own discount - no extra layer at all,
+  // regardless of how many sessions it has. The extra layer only starts
+  // applying at numT=2, ramping linearly up to PacchettoScontoMassimo at
+  // numT=8 (capped there for anything higher).
+  // - totalNormal = Sum(price * sessions), rounded (display only)
+  // - totalDiscounted = Sum(price * sessions * (1 - rowDiscount)), rounded
+  //   (display only) - each line's own discount always applies regardless of numT
+  // - numT (QtyCapped, kept as the field name for now) = min(8, distinct line count)
+  // - scontoCalcolato = 0 when numT==1; otherwise linear interpolation of
+  //   scontoMin (at numT=2) .. scontoMax (at numT=8)
+  // - packetCost = round-to-5(totalDiscountedRAW * (1 - scontoCalcolato)) -
+  //   computed from the UNROUNDED discounted total, not the rounded display value
   private PacchettoPriceResult ComputePacchettoPrice(List<PacchettoItemRequest> items) {
     if (items.Count == 0) {
       return new PacchettoPriceResult { TotalNormal = 0, TotalDiscounted = 0, QtyCapped = 0, ScontoCalcolato = 0, PacketCost = 0 };
@@ -66,27 +73,28 @@ public partial class AppController {
 
     var totalNormalRaw = items.Sum(i => i.UnitPrice * i.SessionCount);
     var totalDiscountedRaw = items.Sum(i => i.UnitPrice * i.SessionCount * (1 - i.DiscountPercent / 100m));
-    var totalQty = items.Sum(i => i.SessionCount);
+    var numT = Math.Min(8, items.Count);
 
-    var qtyCapped = Math.Min(10, totalQty);
+    decimal scontoCalcolato;
+    if (numT <= 1) {
+      // A single therapy never gets the extra layer, no matter the session count.
+      scontoCalcolato = 0m;
+    } else {
+      var scontoMinSetting = _settingsCache.Get("PacchettoScontoMinimo", 5);
+      var scontoMaxSetting = _settingsCache.Get("PacchettoScontoMassimo", 25);
+      var scontoMin = (scontoMinSetting <= 0 ? 5m : scontoMinSetting) / 100m;
+      var scontoMax = (scontoMaxSetting <= 0 ? 25m : scontoMaxSetting) / 100m;
 
-    if (qtyCapped == 0) {
-      return new PacchettoPriceResult { TotalNormal = 0, TotalDiscounted = 0, QtyCapped = 0, ScontoCalcolato = 0, PacketCost = 0 };
+      // numT=2 -> scontoMin, numT=8 -> scontoMax, linear in between.
+      scontoCalcolato = scontoMin * (8 - numT) / 6m + scontoMax * (numT - 2) / 6m;
     }
-
-    var scontoMinSetting = _settingsCache.Get("PacchettoScontoMinimo", 5);
-    var scontoMaxSetting = _settingsCache.Get("PacchettoScontoMassimo", 25);
-    var scontoMin = (scontoMinSetting <= 0 ? 5m : scontoMinSetting) / 100m;
-    var scontoMax = (scontoMaxSetting <= 0 ? 25m : scontoMaxSetting) / 100m;
-
-    var scontoCalcolato = scontoMin * (10 - qtyCapped) / 9m + scontoMax * (qtyCapped - 1) / 9m;
 
     var packetCost = Math.Round(totalDiscountedRaw * (1 - scontoCalcolato) / 5m, MidpointRounding.AwayFromZero) * 5m;
 
     return new PacchettoPriceResult {
       TotalNormal = Math.Round(totalNormalRaw, 2),
       TotalDiscounted = Math.Round(totalDiscountedRaw, 2),
-      QtyCapped = qtyCapped,
+      QtyCapped = numT,
       ScontoCalcolato = Math.Round(scontoCalcolato * 100m, 2),
       PacketCost = packetCost
     };
@@ -111,23 +119,58 @@ public partial class AppController {
       var items = itemsByPacket.ContainsKey(p.Id) ? itemsByPacket[p.Id] : new List<TherapyPacketItem>();
       var itemsSummary = string.Join(", ", items.Select(i =>
         i.SessionCount + " × " + (typeNames.ContainsKey(i.TherapyTypeId) ? typeNames[i.TherapyTypeId] : "?")));
+      var nominalTotal = items.Sum(i => i.UnitPrice * i.SessionCount);
 
       return new {
-        p.Id,
+        Id = (int?)p.Id,
+        isTherapyType = false,
         p.Name,
-        patientName = p.PatientId.HasValue
+        patientName = (string?)(p.PatientId.HasValue
           ? (patientNames.ContainsKey(p.PatientId.Value) ? patientNames[p.PatientId.Value] : "?")
-          : (p.PersonName ?? "Generico"),
+          : (p.PersonName ?? "Generico")),
         p.Approvatore,
+        nominalPrice = (decimal?)Math.Round(nominalTotal, 2),
         p.TotalPrice,
-        p.CreatedAt,
+        CreatedAt = (DateTime?)p.CreatedAt,
         itemsSummary,
         modDate = includeAudit ? p.ModDate : (DateTime?)null,
         modifier = includeAudit && modifierNames.ContainsKey(p.ModUser) ? modifierNames[p.ModUser] : null
       };
+    }).ToList();
+
+    // Every TherapyType with a Tariffario price mixed in among the real
+    // packets - purely informational (CPU's call), so a person can also see
+    // "just this one therapy" priced the same way, without creating anything.
+    // Always assumed at 10 sessions - the packet formula's own volume-discount
+    // cap, so this is really just ComputePacchettoPrice at its top tier.
+    var configs = _db.TherapyPacketConfigs.ToList();
+    var typeTypeRows = configs.Select(c => {
+      var typeName = typeNames.ContainsKey(c.TherapyTypeId) ? typeNames[c.TherapyTypeId] : "?";
+      var priceResult = ComputePacchettoPrice(new List<PacchettoItemRequest> {
+        new PacchettoItemRequest {
+          TherapyTypeId = c.TherapyTypeId,
+          SessionCount = 10,
+          UnitPrice = c.UnitPrice,
+          DiscountPercent = c.DefaultDiscountPercent
+        }
+      });
+
+      return new {
+        Id = (int?)null,
+        isTherapyType = true,
+        Name = (string?)typeName,
+        patientName = (string?)null,
+        Approvatore = (string?)null,
+        nominalPrice = (decimal?)priceResult.TotalNormal,
+        TotalPrice = priceResult.PacketCost,
+        CreatedAt = (DateTime?)null,
+        itemsSummary = "10 × " + typeName,
+        modDate = (DateTime?)null,
+        modifier = (string?)null
+      };
     });
 
-    return Ok(rows);
+    return Ok(rows.Concat(typeTypeRows));
   }
 
   [HttpGet("/Pacchetti/Get/{id}")]

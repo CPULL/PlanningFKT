@@ -48,6 +48,23 @@ namespace minerva.planningfkt.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "FoglioFirmaChecklistItems",
+                columns: table => new
+                {
+                    Key = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    Type = table.Column<int>(type: "int", nullable: false),
+                    PatientId = table.Column<int>(type: "int", nullable: false),
+                    MarkedDate = table.Column<DateOnly>(type: "date", nullable: false),
+                    Fatto = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FoglioFirmaChecklistItems", x => x.Key);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "Patients",
                 columns: table => new
                 {
@@ -148,6 +165,7 @@ namespace minerva.planningfkt.Migrations
                     MaxParallelMale = table.Column<int>(type: "int", nullable: true),
                     MaxParallelFemale = table.Column<int>(type: "int", nullable: true),
                     TherapyWeeklyFrequency = table.Column<int>(type: "int", nullable: false),
+                    AllowsGinnasticaAttiva = table.Column<int>(type: "int", nullable: false),
                     IsActive = table.Column<int>(type: "int", nullable: false),
                     ModDate = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     ModUser = table.Column<int>(type: "int", nullable: false)
@@ -301,6 +319,7 @@ namespace minerva.planningfkt.Migrations
                     TherapyId = table.Column<int>(type: "int", nullable: false),
                     TherapyTypeId = table.Column<int>(type: "int", nullable: false),
                     SessionCount = table.Column<int>(type: "int", nullable: false),
+                    DefaultGinnasticaAttivaSlots = table.Column<int>(type: "int", nullable: false),
                     ModDate = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     ModUser = table.Column<int>(type: "int", nullable: false)
                 },
@@ -363,6 +382,7 @@ namespace minerva.planningfkt.Migrations
                     TimeSlot = table.Column<int>(type: "int", nullable: false),
                     TherapistId = table.Column<int>(type: "int", nullable: true),
                     Status = table.Column<int>(type: "int", nullable: false),
+                    GinnasticaAttivaSlots = table.Column<int>(type: "int", nullable: false),
                     RescheduledToId = table.Column<int>(type: "int", nullable: true),
                     ModDate = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     ModUser = table.Column<int>(type: "int", nullable: true)
@@ -393,26 +413,26 @@ namespace minerva.planningfkt.Migrations
 
             migrationBuilder.InsertData(
                 table: "TherapyTypes",
-                columns: new[] { "Id", "Abbreviazione", "Category", "Color", "Duration", "IsActive", "MaxParallelFemale", "MaxParallelMale", "ModDate", "ModUser", "Name", "TherapyWeeklyFrequency", "Type" },
+                columns: new[] { "Id", "Abbreviazione", "AllowsGinnasticaAttiva", "Category", "Color", "Duration", "IsActive", "MaxParallelFemale", "MaxParallelMale", "ModDate", "ModUser", "Name", "TherapyWeeklyFrequency", "Type" },
                 values: new object[,]
                 {
-                    { 1, "Elettr", 0, 9489145, 15, 1, 4, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Elettroterapia", 7, 0 },
-                    { 2, "Ionof", 0, 16764032, 20, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Ionoforesi", 7, 0 },
-                    { 3, "Infrar", 0, 14842205, 15, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Infrarossi", 7, 0 },
-                    { 4, "Masso15", 0, 13538264, 15, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Massoterapia 15m", 7, 1 },
-                    { 5, "Masso30", 0, 13538264, 30, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Massoterapia 30m", 7, 1 },
-                    { 6, "Mez", 1, 16635957, 60, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Mezieres", 1, 1 },
-                    { 7, "Isocin", 1, 13214247, 30, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Isocinetica", 1, 1 },
-                    { 8, "Ried15", 1, 2541274, 15, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Rieducazione mot 15m", 7, 1 },
-                    { 9, "Ried30", 1, 2541274, 30, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Rieducazione mot 30m", 7, 1 },
-                    { 10, "Ried45", 1, 2541274, 45, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Rieducazione mot 45m", 7, 1 },
-                    { 11, "Laser", 0, 8421376, 15, 1, 2, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Laser", 7, 0 },
-                    { 12, "YAG", 0, 16485376, 10, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Laser YAG", 7, 1 },
-                    { 13, "Magneto", 0, 7901340, 30, 1, 2, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Magneto", 7, 0 },
-                    { 14, "UltraS", 0, 12433259, 15, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Ultrasuoni", 7, 0 },
-                    { 15, "Tecar", 0, 9415055, 30, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Tecar", 7, 1 },
-                    { 16, "OndeU", 1, 15094016, 15, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Onde d'urto", 2, 1 },
-                    { 17, "ShockT", 0, 13990251, 15, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Shock termico", 7, 1 }
+                    { 1, "Elettr", 0, 0, 9489145, 15, 1, 4, 3, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Elettroterapia", 7, 0 },
+                    { 2, "Ionof", 0, 0, 16764032, 20, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Ionoforesi", 7, 0 },
+                    { 3, "Infrar", 0, 0, 14842205, 15, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Infrarossi", 7, 0 },
+                    { 4, "Masso15", 0, 0, 13538264, 15, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Massoterapia 15m", 7, 1 },
+                    { 5, "Masso30", 0, 0, 13538264, 30, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Massoterapia 30m", 7, 1 },
+                    { 6, "Mez", 0, 1, 16635957, 60, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Mezieres", 1, 1 },
+                    { 7, "Isocin", 0, 1, 13214247, 30, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Isocinetica", 1, 1 },
+                    { 8, "Ried15", 0, 1, 2541274, 15, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Rieducazione mot 15m", 7, 1 },
+                    { 9, "Ried30", 0, 1, 2541274, 30, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Rieducazione mot 30m", 7, 1 },
+                    { 10, "Ried45", 0, 1, 2541274, 45, 1, null, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Rieducazione mot 45m", 7, 1 },
+                    { 11, "Laser", 0, 0, 8421376, 15, 1, 2, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Laser", 7, 0 },
+                    { 12, "YAG", 0, 0, 16485376, 10, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Laser YAG", 7, 1 },
+                    { 13, "Magneto", 0, 0, 7901340, 30, 1, 2, 2, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Magneto", 7, 0 },
+                    { 14, "UltraS", 0, 0, 12433259, 15, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Ultrasuoni", 7, 0 },
+                    { 15, "Tecar", 0, 0, 9415055, 30, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Tecar", 7, 1 },
+                    { 16, "OndeU", 0, 1, 15094016, 15, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Onde d'urto", 2, 1 },
+                    { 17, "ShockT", 0, 0, 13990251, 15, 1, 1, 1, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), 1, "Shock termico", 7, 1 }
                 });
 
             migrationBuilder.CreateIndex(
@@ -507,6 +527,9 @@ namespace minerva.planningfkt.Migrations
 
             migrationBuilder.DropTable(
                 name: "AlertMarkedImportants");
+
+            migrationBuilder.DropTable(
+                name: "FoglioFirmaChecklistItems");
 
             migrationBuilder.DropTable(
                 name: "Settings");

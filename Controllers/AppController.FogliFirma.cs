@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using minerva.planningfkt.models;
 
 namespace minerva.planningfkt.controllers;
@@ -24,20 +25,36 @@ public partial class AppController {
   // Two raw queries total: one master aggregate (drives lists 2 and 3, and
   // supplies first/last-date context for list 1), one targeted query for
   // "who has a slot on exactly tomorrow" (drives list 1's membership).
+  //
+  // CHECKLIST (CPU's call): with ~200 rows/day, tracking progress across
+  // reloads matters. On every page load: delete every checklist row not dated
+  // today (so it never carries over), then for each item the live computation
+  // currently produces, create a row if one doesn't already exist for today
+  // (Fatto=false) - a brand-new patient/therapy just falls out of this
+  // naturally, no special-casing needed. Rendering reads the checklist rows
+  // back and sorts Fatto ones to the bottom (ghosted client-side); an item
+  // that's been fully handled for real (e.g. FoglioFirmaStatus advanced past
+  // where this list cares) simply stops appearing in the live computation and
+  // disappears from the rendered list too, checklist row or not.
 
   private class FoglioFirmaPatientDto {
+    public string Key { get; set; } = "";
     public int PatientId { get; set; }
     public string PatientName { get; set; } = "?";
     public string Therapies { get; set; } = "";
     public bool IsFirstSession { get; set; }
     public bool IsLastSession { get; set; }
+    public bool Fatto { get; set; }
   }
 
   private class FoglioFirmaTherapyDto {
+    public string Key { get; set; } = "";
     public int PatientId { get; set; }
+    public int TherapyId { get; set; }
     public string PatientName { get; set; } = "?";
     public string Therapies { get; set; } = "";
     public string RelevantDate { get; set; } = "";
+    public bool Fatto { get; set; }
   }
 
   private class FoglioFirmaTherapyAggregateRow {
@@ -75,6 +92,75 @@ public partial class AppController {
       d = d.AddDays(1);
     }
     return d;
+  }
+
+  private static readonly string[] ItalianMonthNames = {
+    "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+    "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
+  };
+
+  // "<day> <month name> <year>" - CPU's call. Hardcoded rather than relying on
+  // .ToString with an Italian CultureInfo, since that depends on the server
+  // actually having that locale installed.
+  private static string FormatItalianDate(DateOnly date) {
+    return date.Day + " " + ItalianMonthNames[date.Month - 1] + " " + date.Year;
+  }
+
+  // Type + patient + sorted therapy id(s) together form the identity - a
+  // roster entry can (rarely) span more than one therapy for the same patient.
+  private long ComputeFoglioFirmaChecklistKey(int type, int patientId, IEnumerable<int> therapyIds) {
+    var sortedIds = therapyIds.OrderBy(x => x);
+    return ComputeAlertKey("fogliFirmaChecklist|" + type + "|" + patientId + "|" + string.Join(",", sortedIds));
+  }
+
+  // Ensures a checklist row exists (Fatto=false) for every key just computed
+  // live - never overwrites an existing row (that's how a Fatto mark survives
+  // across reloads within the same day). Returns the Fatto value for each key.
+  private Dictionary<long, bool> EnsureChecklistRows(int type, DateOnly today, List<long> keys) {
+    var existing = _db.FoglioFirmaChecklistItems
+      .Where(c => c.Type == type && c.MarkedDate == today && keys.Contains(c.Key))
+      .ToDictionary(c => c.Key, c => c.Fatto);
+
+    foreach (var key in keys.Distinct()) {
+      if (!existing.ContainsKey(key)) {
+        _db.FoglioFirmaChecklistItems.Add(new FoglioFirmaChecklistItem {
+          Key = key,
+          Type = type,
+          PatientId = 0, // not needed for lookups - key alone identifies the row
+          MarkedDate = today,
+          Fatto = false
+        });
+        existing[key] = false;
+      }
+    }
+
+    _db.SaveChanges();
+    return existing;
+  }
+
+  public class FoglioFirmaToggleFattoRequest {
+    public string Key { get; set; } = "";
+  }
+
+  [HttpPost("/FogliFirma/ToggleFatto")]
+  public IActionResult FogliFirmaToggleFatto([FromBody] FoglioFirmaToggleFattoRequest request) {
+    if (!IsCurrentUserAccettazione()) {
+      return Forbid();
+    }
+
+    if (!long.TryParse(request.Key, out var key)) {
+      return BadRequest();
+    }
+
+    var row = _db.FoglioFirmaChecklistItems.Find(key);
+    if (row == null) {
+      return NotFound();
+    }
+
+    row.Fatto = !row.Fatto;
+    _db.SaveChanges();
+
+    return Ok(new { fatto = row.Fatto });
   }
 
   // One row per therapy: true MIN/MAX slot date across ALL of its
@@ -176,12 +262,17 @@ public partial class AppController {
     var windowStart = today.AddMonths(-1);
     var windowEnd = today.AddDays(7);
 
+    // Checklist rows only ever live for "today" - anything from a previous day
+    // is stale and gets cleared before anything else runs.
+    var staleRows = _db.FoglioFirmaChecklistItems.Where(c => c.MarkedDate != today);
+    _db.FoglioFirmaChecklistItems.RemoveRange(staleRows);
+    _db.SaveChanges();
+
     var aggregates = RunFoglioFirmaAggregateQuery();
     var aggregateByTherapyId = aggregates.ToDictionary(a => a.TherapyId, a => a);
     var tomorrowTherapyIds = GetTherapyIdsWithSlotOnDate(targetDate);
 
     // ---- List 1: roster for the next working day ----------------------------
-    var roster = new List<FoglioFirmaPatientDto>();
     var rosterByPatient = new Dictionary<int, List<FoglioFirmaTherapyAggregateRow>>();
 
     foreach (var therapyId in tomorrowTherapyIds) {
@@ -194,50 +285,87 @@ public partial class AppController {
       rosterByPatient[agg.PatientId].Add(agg);
     }
 
-    foreach (var kv in rosterByPatient) {
+    var rosterKeysByPatient = rosterByPatient.ToDictionary(
+      kv => kv.Key,
+      kv => ComputeFoglioFirmaChecklistKey(FoglioFirmaChecklistType.Roster, kv.Key, kv.Value.Select(e => e.TherapyId)));
+    var rosterFattoByKey = EnsureChecklistRows(FoglioFirmaChecklistType.Roster, today, rosterKeysByPatient.Values.ToList());
+
+    var roster = rosterByPatient.Select(kv => {
       var entries = kv.Value;
       var therapyLabels = entries.Select(e => e.TherapyTypes).Where(t => !string.IsNullOrEmpty(t)).Distinct().ToList();
+      var key = rosterKeysByPatient[kv.Key];
 
-      roster.Add(new FoglioFirmaPatientDto {
+      return new FoglioFirmaPatientDto {
+        Key = key.ToString(),
         PatientId = kv.Key,
         PatientName = entries[0].PatientName,
         Therapies = string.Join(", ", therapyLabels),
         IsFirstSession = entries.Any(e => e.MinDate == targetDate),
-        IsLastSession = entries.Any(e => e.MaxDate == targetDate)
-      });
-    }
+        IsLastSession = entries.Any(e => e.MaxDate == targetDate),
+        Fatto = rosterFattoByKey.ContainsKey(key) && rosterFattoByKey[key]
+      };
+    }).ToList();
 
     // ---- List 2: ToBeCreated, windowed by the therapy's FIRST slot date -----
-    var toBeCreated = aggregates
+    var toBeCreatedCandidates = aggregates
       .Where(a => a.FoglioFirmaStatus == FoglioFirmaStatus.ToBeCreated
         && a.BillingCategory != TherapyBillingCategory.Privata
         && a.MinDate >= windowStart && a.MinDate <= windowEnd)
-      .Select(a => new FoglioFirmaTherapyDto {
+      .ToList();
+    var toBeCreatedKeys = toBeCreatedCandidates
+      .ToDictionary(a => a.TherapyId, a => ComputeFoglioFirmaChecklistKey(FoglioFirmaChecklistType.DaPreparare, a.PatientId, new[] { a.TherapyId }));
+    var toBeCreatedFattoByKey = EnsureChecklistRows(FoglioFirmaChecklistType.DaPreparare, today, toBeCreatedKeys.Values.ToList());
+
+    var toBeCreated = toBeCreatedCandidates.Select(a => {
+      var key = toBeCreatedKeys[a.TherapyId];
+      return new FoglioFirmaTherapyDto {
+        Key = key.ToString(),
         PatientId = a.PatientId,
+        TherapyId = a.TherapyId,
         PatientName = a.PatientName,
         Therapies = a.TherapyTypes,
-        RelevantDate = a.MinDate.ToString("dd/MM/yyyy")
-      })
-      .ToList();
+        RelevantDate = FormatItalianDate(a.MinDate),
+        Fatto = toBeCreatedFattoByKey.ContainsKey(key) && toBeCreatedFattoByKey[key]
+      };
+    }).ToList();
 
     // ---- List 3: ToBeFinalized, windowed by the therapy's LAST slot date ----
-    var toBeFinalized = aggregates
+    var toBeFinalizedCandidates = aggregates
       .Where(a => a.FoglioFirmaStatus == FoglioFirmaStatus.ToBeFinalized
         && a.BillingCategory != TherapyBillingCategory.Privata
         && a.MaxDate >= windowStart && a.MaxDate <= windowEnd)
-      .Select(a => new FoglioFirmaTherapyDto {
+      .ToList();
+    var toBeFinalizedKeys = toBeFinalizedCandidates
+      .ToDictionary(a => a.TherapyId, a => ComputeFoglioFirmaChecklistKey(FoglioFirmaChecklistType.DaChiudere, a.PatientId, new[] { a.TherapyId }));
+    var toBeFinalizedFattoByKey = EnsureChecklistRows(FoglioFirmaChecklistType.DaChiudere, today, toBeFinalizedKeys.Values.ToList());
+
+    var toBeFinalized = toBeFinalizedCandidates.Select(a => {
+      var key = toBeFinalizedKeys[a.TherapyId];
+      return new FoglioFirmaTherapyDto {
+        Key = key.ToString(),
         PatientId = a.PatientId,
+        TherapyId = a.TherapyId,
         PatientName = a.PatientName,
         Therapies = a.TherapyTypes,
-        RelevantDate = a.MaxDate.ToString("dd/MM/yyyy")
-      })
-      .ToList();
+        RelevantDate = FormatItalianDate(a.MaxDate),
+        Fatto = toBeFinalizedFattoByKey.ContainsKey(key) && toBeFinalizedFattoByKey[key]
+      };
+    }).ToList();
+
+    // Not-Fatto first, Fatto ghosted at the bottom - within each group, still
+    // alphabetical by patient name.
+    List<FoglioFirmaPatientDto> SortRoster(IEnumerable<FoglioFirmaPatientDto> items) {
+      return items.OrderBy(r => r.Fatto).ThenBy(r => r.PatientName).ToList();
+    }
+    List<FoglioFirmaTherapyDto> SortTherapy(IEnumerable<FoglioFirmaTherapyDto> items) {
+      return items.OrderBy(r => r.Fatto).ThenBy(r => r.PatientName).ToList();
+    }
 
     return Ok(new {
       date = targetDate.ToString("yyyy-MM-dd"),
-      patients = roster.OrderBy(r => r.PatientName).ToList(),
-      toBeCreated = toBeCreated.OrderBy(r => r.PatientName).ToList(),
-      toBeFinalized = toBeFinalized.OrderBy(r => r.PatientName).ToList()
+      patients = SortRoster(roster),
+      toBeCreated = SortTherapy(toBeCreated),
+      toBeFinalized = SortTherapy(toBeFinalized)
     });
   }
 }
