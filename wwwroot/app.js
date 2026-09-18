@@ -940,12 +940,11 @@ $(function() {
 
     setTopbarActions(null);
 
-    // Only ever set while on the Stampa or Piano views (see setStampaPageOrientation/
-    // applyStampaFontSizing) - torn down here so a leftover orientation/font override
-    // never bleeds into printing some other page later.
+    // Only ever set while on the Stampa or Piano views (see
+    // setStampaPageOrientation) - torn down here so a leftover orientation
+    // override never bleeds into printing some other page later.
     if (view !== 'stampa' && view !== 'piano') {
       $('#stampa-page-style').remove();
-      $('#stampa-font-style').remove();
     }
 
     // Only Giorno/Settimana are printable for now - hidden everywhere else, including
@@ -1239,11 +1238,19 @@ $(function() {
         continue;
       }
 
-      var isAvailable = dayAvailability.some(function(a) {
+      var matchingWindow = dayAvailability.filter(function(a) {
         return slot >= a.startTime && slot < a.endTime;
-      });
+      })[0] || null;
 
-      slots.push(isAvailable ? { type: null, label: null } : { type: 'unavailable', label: null });
+      if (!matchingWindow) {
+        slots.push({ type: 'unavailable', label: null });
+      } else if (matchingWindow.overrideOperatingArea !== null && matchingWindow.overrideOperatingArea !== undefined) {
+        // A non-"Normale" window - CPU's call: shown as a "not normal" texture
+        // on empty cells only (never covers an actual booked session).
+        slots.push({ type: 'override', label: null });
+      } else {
+        slots.push({ type: null, label: null });
+      }
     }
 
     return slots;
@@ -1401,7 +1408,7 @@ $(function() {
       var prevInfo = row > 0 ? overlaySlots[row - 1] : null;
       var isRunStart = !prevInfo || prevInfo.type !== overlayInfo.type || prevInfo.label !== overlayInfo.label;
       var overlayClass = overlayInfo.type === 'vacation' ? ' vacation-overlay' :
-        (overlayInfo.type === 'unavailable' ? ' availability-overlay' : '');
+        (overlayInfo.type === 'unavailable' ? ' availability-overlay' : (overlayInfo.type === 'override' ? ' operating-area-override-overlay' : ''));
 
       var $td = $('<td class="giorno-settimana-cell presenze-giorno-cell' + overlayClass + '"></td>');
 
@@ -2737,7 +2744,7 @@ $(function() {
         var capacityClass = giornoCapacityColorClass(capacity, demand, capacityWarningThreshold);
 
         var overlayClass = overlayInfo.type === 'vacation' ? ' vacation-overlay' :
-          (overlayInfo.type === 'unavailable' ? ' availability-overlay' : '');
+          (overlayInfo.type === 'unavailable' ? ' availability-overlay' : (overlayInfo.type === 'override' ? ' operating-area-override-overlay' : ''));
 
         var $td = isSingleDay
           ? $('<td class="giorno-settimana-cell presenze-giorno-cell ' + capacityClass + overlayClass + '"></td>')
@@ -3144,12 +3151,8 @@ $(function() {
     var rowHeightCm = usableHeightCm / Math.max(rowCount, 1);
     rowHeightCm = Math.max(STAMPA_ROW_HEIGHT_MIN_CM, Math.min(STAMPA_ROW_HEIGHT_MAX_CM, rowHeightCm));
 
-    var fontSizeCm = rowHeightCm * 0.62;
-    fontSizeCm = Math.max(0.25, Math.min(0.85, fontSizeCm));
-
     return {
-      rowHeightPx: Math.round(rowHeightCm * STAMPA_CM_TO_PX),
-      fontSizePx: Math.round(fontSizeCm * STAMPA_CM_TO_PX)
+      rowHeightPx: Math.round(rowHeightCm * STAMPA_CM_TO_PX)
     };
   }
 
@@ -3161,12 +3164,8 @@ $(function() {
     var rowHeightCm = usableHeightCm / Math.max(rowCount, 1);
     rowHeightCm = Math.max(STAMPA_ROW_HEIGHT_MIN_CM, Math.min(STAMPA_ROW_HEIGHT_MAX_CM, rowHeightCm));
 
-    var fontSizeCm = rowHeightCm * 0.62;
-    fontSizeCm = Math.max(0.25, Math.min(0.85, fontSizeCm));
-
     return {
-      rowHeightPx: Math.round(rowHeightCm * STAMPA_CM_TO_PX),
-      fontSizePx: Math.round(fontSizeCm * STAMPA_CM_TO_PX)
+      rowHeightPx: Math.round(rowHeightCm * STAMPA_CM_TO_PX)
     };
   }
 
@@ -3179,21 +3178,12 @@ $(function() {
     $('<style id="stampa-page-style">@page { size: ' + orientation + '; }</style>').appendTo('head');
   }
 
-  // Scales a print grid's font sizes to match computeStampaGiornoSizing, via a scoped
-  // <style> tag rather than touching dozens of individual elements' inline styles -
-  // $grid just gets a class to hang these rules off. Removed/replaced the same way
-  // as setStampaPageOrientation above.
-  function applyStampaFontSizing($grid, fontSizePx) {
+  // Marks a print grid so the static print CSS (font sizes, borders, etc. -
+  // fixed values, CPU's call) can target it. Used to inject a dynamically-
+  // computed font size here too; removed per CPU - font size for print is now
+  // a plain fixed value in app.css, nothing computed or injected at runtime.
+  function applyStampaSizedGridClass($grid) {
     $grid.addClass('stampa-sized-grid');
-    $('#stampa-font-style').remove();
-
-    var css =
-      '.stampa-sized-grid .scheduling-grid th, .stampa-sized-grid .scheduling-grid td { font-size: ' + fontSizePx + 'px; }' +
-      '.stampa-sized-grid .pianificazione-session-overlay, .stampa-sized-grid .pianificazione-cell-label { font-size: ' + fontSizePx + 'px; }' +
-      '.stampa-sized-grid .giorno-vacation-label { font-size: ' + Math.round(fontSizePx * 0.85) + 'px; }' +
-      '.stampa-sized-grid .pianificazione-reparto-count { font-size: ' + Math.round(fontSizePx * 0.9) + 'px; }';
-
-    $('<style id="stampa-font-style">' + css + '</style>').appendTo('head');
   }
 
   // Combines the three steps above (compute sizing, build with a custom row height,
@@ -3202,7 +3192,7 @@ $(function() {
   function buildStampaGiornoGrid(data, vacationMatch, labelFn) {
     var sizing = computeStampaGiornoSizing(data.gridEnd - data.gridStart);
     var $grid = buildGiornoGridTable(data, vacationMatch, labelFn, sizing.rowHeightPx);
-    applyStampaFontSizing($grid, sizing.fontSizePx);
+    applyStampaSizedGridClass($grid);
     return $grid;
   }
 
@@ -3210,7 +3200,7 @@ $(function() {
   function buildStampaSettimanaGrid(data, vacationMatchFn, labelFn) {
     var sizing = computeStampaSettimanaSizing(data.gridEnd - data.gridStart);
     var $grid = buildSettimanaGridTable(data, vacationMatchFn, labelFn, sizing.rowHeightPx);
-    applyStampaFontSizing($grid, sizing.fontSizePx);
+    applyStampaSizedGridClass($grid);
     return $grid;
   }
 
@@ -4080,11 +4070,11 @@ $(function() {
 
         for (var s = 0; s < rowCount; s++) {
           var slot = gridMin + s;
-          var withinAvail = dayRanges[c] && weekData.availability.some(function(a) {
+          var matchingAvail = dayRanges[c] ? weekData.availability.filter(function(a) {
             return a.dayOfWeek === (c + 1) && slot >= a.startTime && (slot + 1) <= a.endTime;
-          });
+          })[0] : null;
 
-          if (!withinAvail) {
+          if (!matchingAvail) {
             bgCells.push({ kind: 'unavailable' });
             continue;
           }
@@ -4098,7 +4088,11 @@ $(function() {
             }
           }
 
-          bgCells.push({ kind: 'empty' });
+          // Empty cell where the therapist's effective area at this moment
+          // (their own per-window override, if this window has one) doesn't
+          // match the category currently being planned (CPU's call) - same
+          // rule as the reassign popup's red case, shown proactively here.
+          bgCells.push(matchingAvail.categoryMismatch ? { kind: 'mismatch' } : { kind: 'empty' });
         }
 
         var items = [];
@@ -4194,7 +4188,8 @@ $(function() {
           } else if (bgInfo.kind === 'unavailable') {
             $td = $('<td class="availability-overlay' + todayClass + '"></td>');
           } else {
-            $td = $('<td class="pianificazione-empty-cell' + todayClass + '"></td>');
+            var mismatchClass = bgInfo.kind === 'mismatch' ? ' operating-area-override-overlay' : '';
+            $td = $('<td class="pianificazione-empty-cell' + mismatchClass + todayClass + '"></td>');
             (function(clickDate, clickSlot) {
               $td.on('click', function() {
                 placeAt(clickDate, clickSlot);
@@ -6742,8 +6737,8 @@ $(function() {
         // mostly-Palestra-plus-aiuto in the morning, pure Reparto in the afternoon.
         var $override = $('<select class="availability-override"></select>');
         $override.append('<option value="">Normale</option>');
-        $override.append('<option value="0">Solo Palestra</option>');
-        $override.append('<option value="2">Solo Reparto</option>');
+        $override.append('<option value="0">Palestra</option>');
+        $override.append('<option value="2">Reparto</option>');
         $override.val(overrideOperatingArea !== null && overrideOperatingArea !== undefined ? String(overrideOperatingArea) : '');
         $override.on('change', function() {
           if (dirty) {

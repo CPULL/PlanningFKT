@@ -1255,6 +1255,17 @@ body {
   vertical-align: middle;
 }
 
+/* Empty cell where the therapist has an active per-window override (not
+   "Normale") on this time slot - Giorno/Settimana (CPU's call). Same style
+   used in Pianifica for a category mismatch against the therapist's effective
+   area at that moment. */
+.operating-area-override-overlay {
+  background-color: #ffeeb0;
+  background-image: radial-gradient(#f91 30%, transparent 50%);
+  background-size: 12px 10px;
+  vertical-align: middle;
+}
+
 /* Pianificazione: week-view cell states */
 .pianificazione-progress {
   font-size: 14px;
@@ -1597,6 +1608,23 @@ body {
     margin: 0;
   }
 
+  /* Fixed print sizes (CPU's call) - the dynamic per-print-job font-size
+     computation that used to fight with this has been removed entirely, not
+     just out-specificity'd - this is now the only thing setting these sizes. */
+  .stampa-sized-grid .pianificazione-session-overlay,
+  .stampa-sized-grid .pianificazione-cell-label {
+    font-size: 24px;
+  }
+
+  .stampa-sized-grid .scheduling-grid th,
+  .stampa-sized-grid .scheduling-grid td {
+    font-size: 24px;
+  }
+
+  .stampa-sized-grid .pianificazione-reparto-count {
+    font-size: 24px;
+  }
+
   .sidebar,
   .topbar {
     display: none !important;
@@ -1634,13 +1662,14 @@ body {
      quirk documented elsewhere in this file. */
   .pianificazione-session-overlay {
     background: none !important;
-    border: 1px solid #000 !important;
+    border: 2px solid #000 !important;
     color: #000 !important;
   }
 
   .scheduling-grid th,
   .scheduling-grid td {
     border-color: #000;
+    border-width: 2px;
   }
 
   /* Piano's table only ever had light zebra-striping/header shading, not the same

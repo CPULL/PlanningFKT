@@ -50,6 +50,10 @@ public partial class AppController {
   private class DayAvailabilityRangeDto {
     public int StartTime { get; set; }
     public int EndTime { get; set; }
+    // Non-null = this window is pinned to one pure area, different from the
+    // therapist's main OperatingArea (CPU's call) - used by Giorno/Settimana to
+    // show a "not normal" texture on empty cells in that window.
+    public int? OverrideOperatingArea { get; set; }
   }
 
   private class DayCapacityEntryDto {
@@ -156,7 +160,7 @@ public partial class AppController {
         .GroupBy(a => a.DayOfWeek)
         .ToDictionary(
           g => g.Key,
-          g => g.OrderBy(a => a.StartTime).Select(a => new DayAvailabilityRangeDto { StartTime = a.StartTime, EndTime = a.EndTime }).ToList());
+          g => g.OrderBy(a => a.StartTime).Select(a => new DayAvailabilityRangeDto { StartTime = a.StartTime, EndTime = a.EndTime, OverrideOperatingArea = a.OverrideOperatingArea }).ToList());
       _weeklyAvailabilityCache[therapistId] = weekly;
     }
 

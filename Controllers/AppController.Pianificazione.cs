@@ -438,11 +438,28 @@ public partial class AppController {
       return NotFound();
     }
 
+    var type = _db.TherapyTypes.Find(part.TherapyTypeId);
+    var therapist = _db.Therapists.Find(therapistId);
+
     var weekEnd = weekStart.AddDays(4);
 
+    // categoryMismatch per window (CPU's call): the therapist's EFFECTIVE area
+    // for that window (its own override if set, else their main OperatingArea)
+    // doesn't match the category currently being planned - same rule as the
+    // reassign popup's red case, shown proactively here instead of only on click.
     var availability = _db.TherapistAvailabilities
       .Where(a => a.TherapistId == therapistId)
-      .Select(a => new { a.DayOfWeek, a.StartTime, a.EndTime })
+      .ToList()
+      .Select(a => {
+        var effectiveArea = a.OverrideOperatingArea ?? (therapist?.OperatingArea ?? 0);
+        var effIsReparto = (effectiveArea & TherapistOperatingArea.Reparto) != 0;
+        var effHelpsOtherArea = (effectiveArea & TherapistOperatingArea.HelpsOtherArea) != 0;
+        var categoryMismatch = type != null && (type.Category == TherapyCategory.Palestra
+          ? effectiveArea == TherapistOperatingArea.Reparto
+          : !(effIsReparto || effHelpsOtherArea));
+
+        return new { a.DayOfWeek, a.StartTime, a.EndTime, categoryMismatch };
+      })
       .ToList();
 
     var vacations = _db.Vacations
