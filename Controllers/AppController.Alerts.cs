@@ -81,7 +81,8 @@ public partial class AppController {
     ["therapyRenewal"] = AlertType.TherapyRenewal,
     ["therapistUnderScheduled"] = AlertType.TherapistUnderScheduled,
     ["pastHolidayToUpdate"] = AlertType.PastHolidayToUpdate,
-    ["therapistChangeNotification"] = AlertType.TherapistChangeNotification
+    ["therapistChangeNotification"] = AlertType.TherapistChangeNotification,
+    ["therapyToComplete"] = AlertType.TherapyToComplete
   };
 
   public class MarkImportantAlertRequest {
@@ -173,11 +174,30 @@ public partial class AppController {
 
     // Alert: Therapy defined but not yet scheduled - one card per patient. Key: a
     // patient can only ever have one Therapy awaiting scheduling at a time, so
-    // patientId + type alone is enough (CPU's call). Bounded by ModDate so a
-    // therapy nobody has touched in 2+ weeks stops cluttering the list - CPU:
-    // "all avvisi should be bounded by dates".
-    var toBeScheduled = _db.Therapies
-      .Where(t => t.Status == TherapyStatus.ToBeScheduled && t.ModDate >= pastCutoffDateTime)
+    // patientId + type alone is enough (CPU's call). CPU: older than 2 weeks it's
+    // useless - "old" = the therapy's last change or its last session (e.g. one
+    // whose sessions were all removed), whichever is later.
+    var toBeScheduledCutoff = today.AddDays(-14);
+    var toBeScheduledCutoffDateTime = toBeScheduledCutoff.ToDateTime(TimeOnly.MinValue);
+
+    var toBeScheduledAll = _db.Therapies.AsNoTracking()
+      .Where(t => t.Status == TherapyStatus.ToBeScheduled)
+      .ToList();
+    var toBeScheduledIds = toBeScheduledAll.Select(t => t.Id).ToList();
+    var toBeScheduledPartToTherapy = partCache.Values
+      .Where(p => toBeScheduledIds.Contains(p.TherapyId))
+      .ToDictionary(p => p.Id, p => p.TherapyId);
+    var toBeScheduledPartIds = toBeScheduledPartToTherapy.Keys.ToList();
+    var lastSlotDateByTherapy = _db.TherapySlots.AsNoTracking()
+      .Where(s => toBeScheduledPartIds.Contains(s.TherapyPartId))
+      .Select(s => new { s.TherapyPartId, s.Date })
+      .ToList()
+      .GroupBy(s => toBeScheduledPartToTherapy[s.TherapyPartId])
+      .ToDictionary(g => g.Key, g => g.Max(s => s.Date));
+
+    var toBeScheduled = toBeScheduledAll
+      .Where(t => t.ModDate >= toBeScheduledCutoffDateTime
+        || (lastSlotDateByTherapy.TryGetValue(t.Id, out var lastDate) && lastDate >= toBeScheduledCutoff))
       .ToList();
 
     foreach (var therapy in toBeScheduled) {
@@ -278,10 +298,12 @@ public partial class AppController {
             line1 = patientName,
             line2 = count + " assenze - ultima presenza: " + lastPresenceLabel,
             detail = patientName + " non si è presentato a " + count + " o più sedute (ultima presenza: " + lastPresenceLabel + "). Deve essere rimosso dal calendario.",
-            targetView = "pazienti",
+            // Tied to a specific day (the most recent absence) - "Vai" opens that
+            // day in Settimana rather than the patient page (CPU's call).
+            targetView = "settimana",
             targetId = (int?)group.Key,
-            targetTherapistId = (int?)null,
-            targetDate = (string?)null,
+            targetTherapistId = mostRecent.TherapistId,
+            targetDate = (string?)mostRecent.Date.ToString("yyyy-MM-dd"),
             patientPhone = patient?.Phone,
             patientSex = patient?.Sex,
             absentCount = count,
@@ -302,10 +324,12 @@ public partial class AppController {
             line1 = patientName,
             line2 = count + " assenze",
             detail = patientName + " non si è presentato a 2 sedute. Contattarlo per conferma.",
-            targetView = "pazienti",
+            // Tied to a specific day (the most recent absence) - "Vai" opens that
+            // day in Settimana rather than the patient page (CPU's call).
+            targetView = "settimana",
             targetId = (int?)group.Key,
-            targetTherapistId = (int?)null,
-            targetDate = (string?)null,
+            targetTherapistId = mostRecent.TherapistId,
+            targetDate = (string?)mostRecent.Date.ToString("yyyy-MM-dd"),
             patientPhone = patient?.Phone,
             patientSex = patient?.Sex,
             absentCount = count,
@@ -342,7 +366,7 @@ public partial class AppController {
         continue;
       }
 
-      var span = GetSpanSlots(type);
+      var span = GetSlotSpan(slot, type);
       var isInactive = therapist.IsActive == 0;
       var blockingVacation = FindBlockingVacation(therapist.Id, slot.Date, slot.TimeSlot, span);
 
@@ -385,12 +409,14 @@ public partial class AppController {
       }));
     }
 
-    // Alert: Terapia in scadenza - a Scheduled Therapy with few sessions left
-    // across all its Parts. Key uses the date of the therapy's last placed slot.
-    var renewalThreshold = _settingsCache.Get("AlertForTherapyRenewal", 3);
-    if (renewalThreshold <= 0) {
-      renewalThreshold = 3;
-    }
+    // Two alerts on Scheduled therapies (CPU's rules):
+    // - "Terapia da completare": some sessions aren't planned yet (SessionCount
+    //   minus placed > 0). "Vai" opens the patient page.
+    // - "Terapia in scadenza": the therapy's last planned session is strictly less
+    //   than 4 days from today (and not already past). Unplanned sessions don't
+    //   matter here. "Vai" opens Settimana on that last day. Skipped once the
+    //   therapy has been renewed (a newer, non-Cancelled therapy exists).
+    const int renewalDaysThreshold = 4;
 
     var scheduledTherapies = _db.Therapies.AsNoTracking().Where(t => t.Status == TherapyStatus.Scheduled).ToList();
     var allParts = _db.TherapyParts.AsNoTracking().ToList();
@@ -398,9 +424,15 @@ public partial class AppController {
     var placedCountByPart = nonRescheduledSlots
       .GroupBy(s => s.TherapyPartId)
       .ToDictionary(g => g.Key, g => g.Count());
-    var lastSlotDateByPart = nonRescheduledSlots
+    var slotsByPart = nonRescheduledSlots
       .GroupBy(s => s.TherapyPartId)
-      .ToDictionary(g => g.Key, g => g.Max(s => s.Date));
+      .ToDictionary(g => g.Key, g => g.ToList());
+
+    var latestTherapyIdByPatient = _db.Therapies.AsNoTracking()
+      .Where(t => t.Status != TherapyStatus.Cancelled)
+      .GroupBy(t => t.PatientId)
+      .Select(g => new { PatientId = g.Key, MaxId = g.Max(t => t.Id) })
+      .ToDictionary(x => x.PatientId, x => x.MaxId);
 
     foreach (var therapy in scheduledTherapies) {
       var parts = allParts.Where(p => p.TherapyId == therapy.Id).ToList();
@@ -408,49 +440,84 @@ public partial class AppController {
         continue;
       }
 
-      // remaining is computed from the FULL history (accuracy matters here) - only
-      // the decision to surface the alert is bounded by recency, so a therapy
-      // nobody has touched in months doesn't keep showing up (CPU: "all avvisi
-      // should be bounded by dates" / "terapie in scadenza of 4 months ago").
+      var patientName = patientNames.ContainsKey(therapy.PatientId) ? patientNames[therapy.PatientId] : "?";
+
+      var therapySlots = parts
+        .Where(p => slotsByPart.ContainsKey(p.Id))
+        .SelectMany(p => slotsByPart[p.Id])
+        .ToList();
+      var lastSlot = therapySlots
+        .OrderByDescending(s => s.Date)
+        .ThenByDescending(s => s.TimeSlot)
+        .FirstOrDefault();
+
+      // remaining = sessions not planned yet, from the FULL history.
       var remaining = parts.Sum(p => {
         var placed = placedCountByPart.ContainsKey(p.Id) ? placedCountByPart[p.Id] : 0;
         return Math.Max(0, p.SessionCount - placed);
       });
+      var placedTotal = parts.Sum(p => placedCountByPart.ContainsKey(p.Id) ? placedCountByPart[p.Id] : 0);
 
-      if (remaining > 0 && remaining <= renewalThreshold) {
-        var lastSlotDate = parts
-          .Where(p => lastSlotDateByPart.ContainsKey(p.Id))
-          .Select(p => lastSlotDateByPart[p.Id])
-          .DefaultIfEmpty()
-          .Max();
-
-        if (lastSlotDate < pastCutoff) {
-          continue;
+      if (remaining > 0 && (lastSlot == null || lastSlot.Date >= pastCutoff)) {
+        var completeKey = ComputeAlertKey("therapyToComplete|" + therapy.Id + "|" + placedTotal);
+        if (!dismissedKeys.Contains(completeKey)) {
+          alerts.Add((completeKey, new {
+            type = "therapyToComplete",
+            title = "Terapia da completare",
+            icon = "🧩",
+            color = "#5C6BC0",
+            dismissKey = completeKey.ToString(),
+            line1 = patientName,
+            line2 = remaining + " sedut" + (remaining == 1 ? "a" : "e") + " da pianificare",
+            detail = "La terapia di " + patientName + " ha ancora " + remaining + " sedut" + (remaining == 1 ? "a" : "e") + " da pianificare.",
+            targetView = "pazienti",
+            targetId = (int?)therapy.PatientId,
+            targetTherapistId = (int?)null,
+            targetDate = (string?)null,
+            remaining
+          }));
         }
-
-        var key = ComputeAlertKey("therapyRenewal|" + therapy.PatientId + "|" + lastSlotDate);
-        if (dismissedKeys.Contains(key)) {
-          continue;
-        }
-
-        var patientName = patientNames.ContainsKey(therapy.PatientId) ? patientNames[therapy.PatientId] : "?";
-        var lastSlotLabel = lastSlotDate != default ? lastSlotDate.ToString("dd/MM/yyyy") : "n/d";
-
-        alerts.Add((key, new {
-          type = "therapyRenewal",
-          title = "Terapia in scadenza",
-          icon = "⏳",
-          color = "#00A97B",
-          dismissKey = key.ToString(),
-          line1 = patientName,
-          line2 = lastSlotLabel,
-          detail = "La terapia di " + patientName + " è in scadenza: " + remaining + " sedut" + (remaining == 1 ? "a" : "e") + " rimaste (ultima seduta pianificata: " + lastSlotLabel + ").",
-          targetView = "pazienti",
-          targetId = (int?)therapy.PatientId,
-          targetTherapistId = (int?)null,
-          targetDate = (string?)null
-        }));
       }
+
+      if (lastSlot == null) {
+        continue;
+      }
+
+      // "Non rinnova" ticked on the therapy: no renewal alert.
+      if (therapy.NonRinnova) {
+        continue;
+      }
+
+      if (latestTherapyIdByPatient.TryGetValue(therapy.PatientId, out var latestId) && latestId > therapy.Id) {
+        continue;
+      }
+
+      var daysToLast = lastSlot.Date.DayNumber - today.DayNumber;
+      if (daysToLast < 0 || daysToLast >= renewalDaysThreshold) {
+        continue;
+      }
+
+      var key = ComputeAlertKey("therapyRenewal|" + therapy.PatientId + "|" + lastSlot.Date);
+      if (dismissedKeys.Contains(key)) {
+        continue;
+      }
+
+      var lastSlotLabel = lastSlot.Date.ToString("dd/MM/yyyy");
+
+      alerts.Add((key, new {
+        type = "therapyRenewal",
+        title = "Terapia in scadenza",
+        icon = "⏳",
+        color = "#00A97B",
+        dismissKey = key.ToString(),
+        line1 = patientName,
+        line2 = lastSlotLabel,
+        detail = "La terapia di " + patientName + " è in scadenza (ultima seduta pianificata: " + lastSlotLabel + ").",
+        targetView = "settimana",
+        targetId = (int?)therapy.PatientId,
+        targetTherapistId = lastSlot.TherapistId,
+        targetDate = (string?)lastSlot.Date.ToString("yyyy-MM-dd")
+      }));
     }
 
     // Alert: Terapista sotto-pianificato - a run of `threshold` consecutive
@@ -622,10 +689,11 @@ public partial class AppController {
         detail = changeTherapistName + " è il nuovo terapista per " + changePatientName + "\n" +
                  "La terapia è spostata al " + changeDayName + " " + changeDateLabel + "\n" +
                  "Avvisare del cambio: " + changePatientPhone,
-        targetView = "pazienti",
+        // Tied to a specific day (the moved session) - opens it in Settimana.
+        targetView = "settimana",
         targetId = (int?)changeTherapy.PatientId,
-        targetTherapistId = (int?)null,
-        targetDate = (string?)null
+        targetTherapistId = changeSlot.TherapistId,
+        targetDate = (string?)changeSlot.Date.ToString("yyyy-MM-dd")
       }));
     }
 

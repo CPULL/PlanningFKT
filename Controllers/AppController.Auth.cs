@@ -17,7 +17,8 @@ public partial class AppController {
   [HttpPost("login")]
   [AllowAnonymous]
   public async Task<IActionResult> Login([FromBody] LoginRequest request) {
-    var therapist = _db.Therapists.FirstOrDefault(t => t.Name == request.Name);
+    var trimmedName = (request.Name ?? "").Trim();
+    var therapist = _db.Therapists.FirstOrDefault(t => t.Name == trimmedName);
 
     if (therapist == null || therapist.PasswordHash == null) {
       return Unauthorized();
@@ -38,7 +39,9 @@ public partial class AppController {
     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
     var principal = new ClaimsPrincipal(identity);
 
-    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties {
+      IsPersistent = true
+    });
 
     return Ok(new { name = therapist.Name });
   }

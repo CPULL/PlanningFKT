@@ -83,6 +83,16 @@ public static class TherapySlotStatus {
   public const int Done = 1;
   public const int PatientAbsent = 2;
   public const int Rescheduled = 3;
+
+  public static string ToLabel(int status) {
+    switch (status) {
+      case ToBeDone: return "Da fare";
+      case Done: return "Fatto";
+      case PatientAbsent: return "Assente";
+      case Rescheduled: return "Rischedulato";
+      default: return "Sconosciuto";
+    }
+  }
 }
 
 // Vacation.AMPM
@@ -145,5 +155,14 @@ public enum AlertType {
   TherapyRenewal,
   TherapistUnderScheduled,
   PastHolidayToUpdate,
-  TherapistChangeNotification
+  TherapistChangeNotification,
+  TherapyToComplete
+}
+
+// FoglioFirmaChecklistItem.Type - which of the 3 Fogli Firma lists a checklist
+// row belongs to.
+public static class FoglioFirmaChecklistType {
+  public const int Roster = 0;
+  public const int DaPreparare = 1;
+  public const int DaChiudere = 2;
 }

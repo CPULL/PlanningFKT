@@ -15,6 +15,10 @@ public partial class AppController {
     public int TherapistId { get; set; }
   }
 
+  public class GestisciAssenzaRemoveRequest {
+    public int TherapistId { get; set; }
+  }
+
   public class GestisciAssenzaMarkCalledRequest {
     public int TherapistId { get; set; }
     public int PatientId { get; set; }
@@ -130,7 +134,17 @@ public partial class AppController {
     var typeCache = GetTypeCache();
 
     var rows = _db.TherapistAbsenceCalls.ToList();
-    var therapistIds = rows.Select(r => r.TherapistId).Distinct().ToList();
+
+    // The list of today's absences (CPU): every therapist reported here, plus
+    // anyone else with a single-day absence for today (e.g. reported when they
+    // had no patients, so no call rows exist) - each one can be removed.
+    var today = DateOnly.FromDateTime(DateTime.Today);
+    var absentTodayIds = _db.Vacations
+      .Where(v => v.TherapistId != null && v.StartDate == today && v.EndDate == today)
+      .Select(v => v.TherapistId!.Value)
+      .ToList();
+
+    var therapistIds = rows.Select(r => r.TherapistId).Concat(absentTodayIds).Distinct().ToList();
 
     var result = therapistIds.Select(tid => {
       var therapist = therapistCache.ContainsKey(tid) ? therapistCache[tid] : null;
@@ -177,6 +191,31 @@ public partial class AppController {
     }).OrderBy(t => t.therapistName).ToList();
 
     return Ok(result);
+  }
+
+  // Undo for a wrong report (CPU): removes every single-day absence of this
+  // therapist for today (including the one "Inserisci assenza" created) and
+  // their call list. Sessions already moved with Ripianifica stay where they are.
+  [HttpPost("/GestisciAssenza/Remove")]
+  public IActionResult GestisciAssenzaRemove([FromBody] GestisciAssenzaRemoveRequest request) {
+    if (!IsCurrentUserAccettazione()) {
+      return Forbid();
+    }
+
+    var today = DateOnly.FromDateTime(DateTime.Today);
+
+    var vacations = _db.Vacations
+      .Where(v => v.TherapistId == request.TherapistId && v.StartDate == today && v.EndDate == today)
+      .ToList();
+    var callRows = _db.TherapistAbsenceCalls
+      .Where(r => r.TherapistId == request.TherapistId)
+      .ToList();
+
+    _db.Vacations.RemoveRange(vacations);
+    _db.TherapistAbsenceCalls.RemoveRange(callRows);
+    _db.SaveChanges();
+
+    return Ok(new { removedAbsences = vacations.Count });
   }
 
   [HttpPost("/GestisciAssenza/MarkCalled")]

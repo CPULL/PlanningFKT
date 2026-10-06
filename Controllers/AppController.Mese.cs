@@ -62,7 +62,7 @@ public partial class AppController {
             return 0;
           }
 
-          var span = GetSpanSlots(type);
+          var span = GetSlotSpan(s, type);
           if (s.TherapistId.HasValue && IsBlockedByVacation(s.TherapistId.Value, date, s.TimeSlot, span)) {
             return 0;
           }

@@ -60,6 +60,56 @@ namespace minerva.planningfkt.Migrations
                     b.ToTable("AlertMarkedImportants");
                 });
 
+            modelBuilder.Entity("minerva.planningfkt.models.FoglioFirmaChecklistItem", b =>
+                {
+                    b.Property<long>("Key")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Key"));
+
+                    b.Property<bool>("Fatto")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateOnly>("MarkedDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("FoglioFirmaChecklistItems");
+                });
+
+            modelBuilder.Entity("minerva.planningfkt.models.GenericRepartoWork", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<int>("TherapistId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TimeSlot")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TherapistId", "Date", "TimeSlot")
+                        .IsUnique();
+
+                    b.ToTable("GenericRepartoWorks");
+                });
+
             modelBuilder.Entity("minerva.planningfkt.models.Patient", b =>
                 {
                     b.Property<int>("Id")
@@ -100,6 +150,629 @@ namespace minerva.planningfkt.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Patients");
+                });
+
+            modelBuilder.Entity("minerva.planningfkt.models.PrCode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<decimal>("Cost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<DateTime>("ModDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("ModUser")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("PrCodes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "PR1",
+                            Cost = 202.30m,
+                            Description = "Paresi del nervo facciale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "PR2",
+                            Cost = 202.30m,
+                            Description = "Mononeuriti dell'arto superiore e inferiore di origine meccanica e non meccanica e neuriti multiple",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "PR3",
+                            Cost = 195.10m,
+                            Description = "Monoartriti solo in caso di riacutizzazioni, comprese le riacutizzazioni localizzate in corso di artrite reumatoide",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "PR4A",
+                            Cost = 231.60m,
+                            Description = "Frattura della clavicola (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "PR4B",
+                            Cost = 231.60m,
+                            Description = "Frattura della scapola (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "PR4C",
+                            Cost = 231.60m,
+                            Description = "Frattura omero compreso paletta omerale (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "PR4D",
+                            Cost = 231.60m,
+                            Description = "Frattura radio, ulna (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Code = "PR4E",
+                            Cost = 231.60m,
+                            Description = "Frattura ossa carpo e metacarpo (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Code = "PR4F",
+                            Cost = 231.60m,
+                            Description = "Frattura di una o più falangi della mano (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Code = "PR5A",
+                            Cost = 231.60m,
+                            Description = "Lussazione della spalla (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Code = "PR5B",
+                            Cost = 231.60m,
+                            Description = "Lussazione del gomito (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Code = "PR5C",
+                            Cost = 231.60m,
+                            Description = "Lussazione del polso (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Code = "PR5D",
+                            Cost = 231.60m,
+                            Description = "Lussazione delle dita della mano (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Code = "PR6A",
+                            Cost = 231.60m,
+                            Description = "Distorsione della spalla e del braccio (compreso instabilità gleno omerale) (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 15,
+                            Code = "PR6B",
+                            Cost = 231.60m,
+                            Description = "Distorsione del gomito e dell'avambraccio (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 16,
+                            Code = "PR6C",
+                            Cost = 231.60m,
+                            Description = "Distorsione del polso e della mano (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 17,
+                            Code = "PR7",
+                            Cost = 214.50m,
+                            Description = "Lesioni della spalla (compreso rottura atraumatica della cuffia dei rotatori)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 18,
+                            Code = "PR8",
+                            Cost = 152.90m,
+                            Description = "Traumatismo dei nervi della spalla e del braccio (compreso avambraccio, polso e mano) - esiti funzionali",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 19,
+                            Code = "PR9",
+                            Cost = 214.50m,
+                            Description = "Traumatismo dei muscoli e dei tendini della spalla e del braccio (compreso avambraccio, polso e mano) esiti funzionali",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 20,
+                            Code = "PR10",
+                            Cost = 228.20m,
+                            Description = "Frattura collo femore e di altre parti del femore di tipo traumatico (in soggetto < 65 anni) - esiti funzionali",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 21,
+                            Code = "PR11A",
+                            Cost = 228.20m,
+                            Description = "Frattura della rotula",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 22,
+                            Code = "PR11B",
+                            Cost = 228.20m,
+                            Description = "Frattura della tibia e del perone",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 23,
+                            Code = "PR11C",
+                            Cost = 228.20m,
+                            Description = "Frattura della caviglia",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 24,
+                            Code = "PR11D",
+                            Cost = 228.20m,
+                            Description = "Frattura di una o più ossa del tarso e metatarso",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 25,
+                            Code = "PR11E",
+                            Cost = 228.20m,
+                            Description = "Frattura di una o più falangi del piede",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 26,
+                            Code = "PR12A",
+                            Cost = 228.20m,
+                            Description = "Lussazione di ginocchio (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 27,
+                            Code = "PR12B",
+                            Cost = 228.20m,
+                            Description = "Lussazione della caviglia (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 28,
+                            Code = "PR12C",
+                            Cost = 228.20m,
+                            Description = "Lussazione del piede (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 29,
+                            Code = "PR13A",
+                            Cost = 230.40m,
+                            Description = "Distorsione dell'anca e della coscia (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 30,
+                            Code = "PR13B",
+                            Cost = 230.40m,
+                            Description = "Distorsione del ginocchio e della gamba (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 31,
+                            Code = "PR13C",
+                            Cost = 230.40m,
+                            Description = "Distorsione della caviglia e del piede (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 32,
+                            Code = "PR14",
+                            Cost = 215.80m,
+                            Description = "Disturbi della rotula, lesioni capsulo-legamentose del ginocchio e del menisco (trattamento post chirurgico)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 33,
+                            Code = "PR15",
+                            Cost = 152.90m,
+                            Description = "Traumatismo di nervi dell'anca e della coscia - compreso gamba, caviglia e piede - (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 34,
+                            Code = "PR16",
+                            Cost = 215.80m,
+                            Description = "Traumatismo di muscoli e tendini della gamba (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 35,
+                            Code = "PR17",
+                            Cost = 221.30m,
+                            Description = "Frattura della colonna vertebrale senza menzione di lesione del midollo spinale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 36,
+                            Code = "PR18",
+                            Cost = 221.30m,
+                            Description = "Frattura del bacino (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 37,
+                            Code = "PR19",
+                            Cost = 231.60m,
+                            Description = "Lussazione della mandibola (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 38,
+                            Code = "PR20",
+                            Cost = 221.30m,
+                            Description = "Distorsione del rachide, della regione sacroiliaca e di altre parti non specificate del dorso (esiti funzionali)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 39,
+                            Code = "PR21",
+                            Cost = 255.40m,
+                            Description = "Disturbi dei plessi e delle radici nervose (associata a stenosi del canale vertebrale cervicale o lombare) solo in presenza di limitazione algofunzionale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 40,
+                            Code = "PR22",
+                            Cost = 152.90m,
+                            Description = "Compressione dei plessi e delle radici nervose (associata a sindrome brachialgica o sciatalgica) (solo in presenza di limitazione algofunzionale persistente)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 41,
+                            Code = "PR23",
+                            Cost = 255.40m,
+                            Description = "Limitazione algofunzionale da mal di schiena acuto/postacuto persistente (2-3 settimane) e/o recidivante",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 42,
+                            Code = "PR24",
+                            Cost = 214.50m,
+                            Description = "Alterazioni di continuità dell'osso (mancata consolidazione)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 43,
+                            Code = "PR25A",
+                            Cost = 152.90m,
+                            Description = "Calcificazione e ossificazione dei muscoli (come complicanza di eventi traumatici recenti)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 44,
+                            Code = "PR25B",
+                            Cost = 152.90m,
+                            Description = "Malattie dei tessuti molli correlate ad uso eccessivo, pressione",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 45,
+                            Code = "PR26A",
+                            Cost = 255.40m,
+                            Description = "Esiti di intervento per impianto di artroprotesi ginocchio",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 46,
+                            Code = "PR26B",
+                            Cost = 255.40m,
+                            Description = "Esiti di intervento per impianto di artroprotesi spalla",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 47,
+                            Code = "PR26C",
+                            Cost = 255.40m,
+                            Description = "Esiti di intervento per impianto di artroprotesi anca",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 48,
+                            Code = "PR27",
+                            Cost = 231.60m,
+                            Description = "Trauma da parto del sistema nervoso periferico senza lesione complessa del tronco nervoso (paralisi ostetrica)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 49,
+                            Code = "PR28",
+                            Cost = 231.60m,
+                            Description = "Deformità congenita dell'anca seguito da trattamento ortopedico (displasia dell'anca)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 50,
+                            Code = "PR29",
+                            Cost = 231.60m,
+                            Description = "Deformazione dei piedi (piede torto congenito)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 51,
+                            Code = "PR30",
+                            Cost = 152.90m,
+                            Description = "Torcicollo miogeno congenito del neonato",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 52,
+                            Code = "PR31I",
+                            Cost = 152.90m,
+                            Description = "Disturbi della voce di origine funzionale (compresi noduli, polipi, edemi e prolassi) e negli esiti di cordectomia semplice e paralisi cordale ricorrenziale (terapia individuale)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 53,
+                            Code = "PR31G",
+                            Cost = 51.00m,
+                            Description = "Disturbi della voce di origine funzionale (compresi noduli, polipi, edemi e prolassi) e negli esiti di cordectomia semplice e paralisi cordale ricorrenziale (terapia di gruppo)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 54,
+                            Code = "PR32I",
+                            Cost = 152.90m,
+                            Description = "Disturbi semplici del linguaggio (late talkers, disturbi fonetici semplici) individuale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 55,
+                            Code = "PR32G",
+                            Cost = 51.00m,
+                            Description = "Disturbi semplici del linguaggio (late talkers, disturbi fonetici semplici) di gruppo",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 56,
+                            Code = "PR33I",
+                            Cost = 152.90m,
+                            Description = "Disturbi miofunzionali odontofacciali (inclusa deglutizione atipica) terapia individuale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 57,
+                            Code = "PR33G",
+                            Cost = 51.00m,
+                            Description = "Disturbi miofunzionali odontofacciali (inclusa deglutizione atipica) (terapia di gruppo costituita da 3 a max 5 persone)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 58,
+                            Code = "PR34I",
+                            Cost = 152.90m,
+                            Description = "Disturbo respiratorio semplice senza insufficienza respiratoria (terapia individuale)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 59,
+                            Code = "PR34G",
+                            Cost = 51.00m,
+                            Description = "Disturbo respiratorio semplice senza insufficienza respiratoria (terapia di gruppo)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 60,
+                            Code = "PR35A",
+                            Cost = 152.90m,
+                            Description = "Linfedemi degli arti (post mastectomia arto superiore o per altre condizioni patologiche arto inferiore) (costo per n. 5 accessi di 60 min.)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 61,
+                            Code = "PR35B",
+                            Cost = 162.30m,
+                            Description = "Incontinenza urinaria e/o fecale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 62,
+                            Code = "PR36A",
+                            Cost = 195.10m,
+                            Description = "Disturbi delle sinovie con limitazione algofunzionale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 63,
+                            Code = "PR36B",
+                            Cost = 195.10m,
+                            Description = "Borsopatie con limitazione algofunzionale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 64,
+                            Code = "PR36C",
+                            Cost = 195.10m,
+                            Description = "Entesopatie con limitazione algofunzionale",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        },
+                        new
+                        {
+                            Id = 65,
+                            Code = "PR37",
+                            Cost = 60.00m,
+                            Description = "Attività motoria per esiti stabilizzati da patologie croniche (tariffa per 1 pacchetto di 20 accessi)",
+                            ModDate = new DateTime(2026, 10, 3, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            ModUser = 1
+                        });
                 });
 
             modelBuilder.Entity("minerva.planningfkt.models.Setting", b =>
@@ -219,6 +892,9 @@ namespace minerva.planningfkt.Migrations
                     b.Property<int>("EndTime")
                         .HasColumnType("int");
 
+                    b.Property<int?>("OverrideOperatingArea")
+                        .HasColumnType("int");
+
                     b.Property<int>("StartTime")
                         .HasColumnType("int");
 
@@ -256,15 +932,26 @@ namespace minerva.planningfkt.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");
 
+                    b.Property<bool>("NonRinnova")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("Pagato")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("PatientId")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int?>("TherapyPacketId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PatientId");
+
+                    b.HasIndex("TherapyPacketId");
 
                     b.ToTable("Therapies");
                 });
@@ -387,6 +1074,9 @@ namespace minerva.planningfkt.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("DefaultGinnasticaAttivaSlots")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("ModDate")
                         .HasColumnType("datetime(6)");
 
@@ -411,6 +1101,29 @@ namespace minerva.planningfkt.Migrations
                     b.ToTable("TherapyParts");
                 });
 
+            modelBuilder.Entity("minerva.planningfkt.models.TherapyPrCode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("PrCodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TherapyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrCodeId");
+
+                    b.HasIndex("TherapyId");
+
+                    b.ToTable("TherapyPrCodes");
+                });
+
             modelBuilder.Entity("minerva.planningfkt.models.TherapySlot", b =>
                 {
                     b.Property<int>("Id")
@@ -421,6 +1134,12 @@ namespace minerva.planningfkt.Migrations
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
+
+                    b.Property<int>("ExtraSlots")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GinnasticaAttivaSlots")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("ModDate")
                         .HasColumnType("datetime(6)");
@@ -442,6 +1161,9 @@ namespace minerva.planningfkt.Migrations
 
                     b.Property<int>("TimeSlot")
                         .HasColumnType("int");
+
+                    b.Property<bool>("WasAbsent")
+                        .HasColumnType("tinyint(1)");
 
                     b.HasKey("Id");
 
@@ -469,6 +1191,9 @@ namespace minerva.planningfkt.Migrations
                     b.Property<string>("Abbreviazione")
                         .HasMaxLength(8)
                         .HasColumnType("varchar(8)");
+
+                    b.Property<int>("AllowsGinnasticaAttiva")
+                        .HasColumnType("int");
 
                     b.Property<int>("Category")
                         .HasColumnType("int");
@@ -514,6 +1239,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 1,
                             Abbreviazione = "Elettr",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 9489145,
                             Duration = 15,
@@ -530,6 +1256,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 2,
                             Abbreviazione = "Ionof",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 16764032,
                             Duration = 20,
@@ -546,6 +1273,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 3,
                             Abbreviazione = "Infrar",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 14842205,
                             Duration = 15,
@@ -562,6 +1290,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 4,
                             Abbreviazione = "Masso15",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 13538264,
                             Duration = 15,
@@ -576,6 +1305,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 5,
                             Abbreviazione = "Masso30",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 13538264,
                             Duration = 30,
@@ -590,6 +1320,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 6,
                             Abbreviazione = "Mez",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 16635957,
                             Duration = 60,
@@ -604,6 +1335,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 7,
                             Abbreviazione = "Isocin",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 13214247,
                             Duration = 30,
@@ -618,6 +1350,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 8,
                             Abbreviazione = "Ried15",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 2541274,
                             Duration = 15,
@@ -632,6 +1365,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 9,
                             Abbreviazione = "Ried30",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 2541274,
                             Duration = 30,
@@ -646,6 +1380,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 10,
                             Abbreviazione = "Ried45",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 2541274,
                             Duration = 45,
@@ -660,6 +1395,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 11,
                             Abbreviazione = "Laser",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 8421376,
                             Duration = 15,
@@ -676,6 +1412,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 12,
                             Abbreviazione = "YAG",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 16485376,
                             Duration = 10,
@@ -692,6 +1429,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 13,
                             Abbreviazione = "Magneto",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 7901340,
                             Duration = 30,
@@ -708,6 +1446,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 14,
                             Abbreviazione = "UltraS",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 12433259,
                             Duration = 15,
@@ -724,6 +1463,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 15,
                             Abbreviazione = "Tecar",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 9415055,
                             Duration = 30,
@@ -740,6 +1480,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 16,
                             Abbreviazione = "OndeU",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 15094016,
                             Duration = 15,
@@ -756,6 +1497,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 17,
                             Abbreviazione = "ShockT",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 13990251,
                             Duration = 15,
@@ -832,6 +1574,11 @@ namespace minerva.planningfkt.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("minerva.planningfkt.models.TherapyPacket", null)
+                        .WithMany()
+                        .HasForeignKey("TherapyPacketId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("minerva.planningfkt.models.TherapyPacket", b =>
@@ -878,6 +1625,21 @@ namespace minerva.planningfkt.Migrations
                         .WithMany()
                         .HasForeignKey("TherapyTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("minerva.planningfkt.models.TherapyPrCode", b =>
+                {
+                    b.HasOne("minerva.planningfkt.models.PrCode", null)
+                        .WithMany()
+                        .HasForeignKey("PrCodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("minerva.planningfkt.models.Therapy", null)
+                        .WithMany()
+                        .HasForeignKey("TherapyId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

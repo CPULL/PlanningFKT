@@ -48,7 +48,8 @@ public partial class AppController {
 
     if (!_therapistSlotsByDateCache.TryGetValue(key, out var slots)) {
       slots = _db.TherapySlots
-        .Where(s => s.TherapistId == therapistId && s.Date == date && s.Status != TherapySlotStatus.Rescheduled)
+        .Where(s => s.TherapistId == therapistId && s.Date == date && s.Status != TherapySlotStatus.Rescheduled
+          && !_replanExcludedSlotIds.Contains(s.Id))
         .ToList();
       _therapistSlotsByDateCache[key] = slots;
     }
@@ -64,7 +65,7 @@ public partial class AppController {
         continue;
       }
 
-      var span = GetSpanSlots(type);
+      var span = GetSlotSpan(slot, type);
       if (timeSlot >= slot.TimeSlot && timeSlot < slot.TimeSlot + span) {
         return true;
       }
@@ -77,7 +78,9 @@ public partial class AppController {
     _allSlotsByDateCache ??= new Dictionary<DateOnly, List<TherapySlot>>();
 
     if (!_allSlotsByDateCache.TryGetValue(date, out var slotsOnDate)) {
-      slotsOnDate = _db.TherapySlots.Where(s => s.Date == date && s.Status != TherapySlotStatus.Rescheduled).ToList();
+      slotsOnDate = _db.TherapySlots
+        .Where(s => s.Date == date && s.Status != TherapySlotStatus.Rescheduled && !_replanExcludedSlotIds.Contains(s.Id))
+        .ToList();
       _allSlotsByDateCache[date] = slotsOnDate;
     }
 
@@ -93,7 +96,7 @@ public partial class AppController {
         continue;
       }
 
-      var span = GetSpanSlots(type);
+      var span = GetSlotSpan(s, type);
       if (slot >= s.TimeSlot && slot < s.TimeSlot + span) {
         count++;
       }
@@ -137,7 +140,7 @@ public partial class AppController {
   // --- Endpoints ---------------------------------------------------------------
 
   [HttpGet("/Pianificazione/RepartoInfo/{therapyId}")]
-  public IActionResult PianificazioneRepartoInfo(int therapyId) {
+  public IActionResult PianificazioneRepartoInfo(int therapyId, string? exclude = null) {
     if (!IsCurrentUserAccettazione()) {
       return Forbid();
     }
@@ -147,6 +150,8 @@ public partial class AppController {
     if (therapy == null) {
       return NotFound();
     }
+
+    SetReplanExclusion(therapy.Id, ParseIdList(exclude));
 
     var patient = _db.Patients.Find(therapy.PatientId);
 
@@ -176,16 +181,19 @@ public partial class AppController {
       })
       .ToList();
 
+    var existingSessions = GetExistingPatientSessions(patient.Id);
+
     return Ok(new {
       therapyId = therapy.Id,
       patientId = patient.Id,
       patientName = patient.Name,
-      parts
+      parts,
+      existingSessions
     });
   }
 
   [HttpGet("/Pianificazione/RepartoWeekData")]
-  public IActionResult PianificazioneRepartoWeekData(int therapyId, DateOnly weekStart) {
+  public IActionResult PianificazioneRepartoWeekData(int therapyId, DateOnly weekStart, string? exclude = null) {
     if (!IsCurrentUserAccettazione()) {
       return Forbid();
     }
@@ -195,6 +203,8 @@ public partial class AppController {
     if (therapy == null) {
       return NotFound();
     }
+
+    SetReplanExclusion(therapy.Id, ParseIdList(exclude));
 
     var weekEnd = weekStart.AddDays(4);
 
@@ -219,7 +229,8 @@ public partial class AppController {
     var patientCache = _db.Patients.ToDictionary(p => p.Id, p => p.Name);
 
     var weekSlotsRaw = _db.TherapySlots
-      .Where(s => s.Date >= weekStart && s.Date <= weekEnd && s.Status != TherapySlotStatus.Rescheduled)
+      .Where(s => s.Date >= weekStart && s.Date <= weekEnd && s.Status != TherapySlotStatus.Rescheduled
+        && !_replanExcludedSlotIds.Contains(s.Id))
       .ToList();
 
     // Both Light and Active Reparto sessions show up in the count/popup display -
@@ -249,7 +260,7 @@ public partial class AppController {
         s.Id,
         s.Date,
         s.TimeSlot,
-        durationSlots = type != null ? GetSpanSlots(type) : 1,
+        durationSlots = GetSlotSpan(s, type),
         therapyTypeId = part != null ? part.TherapyTypeId : (int?)null,
         therapyTypeName = type != null ? type.Name : "?",
         patientName = slotTherapy != null && patientCache.ContainsKey(slotTherapy.PatientId) ? patientCache[slotTherapy.PatientId] : "?",
@@ -278,7 +289,7 @@ public partial class AppController {
         s.Id,
         s.Date,
         s.TimeSlot,
-        durationSlots = type != null ? GetSpanSlots(type) : 1,
+        durationSlots = GetSlotSpan(s, type),
         therapyTypeName = type != null ? type.Name : "?",
         therapistId = s.TherapistId,
         therapistName = s.TherapistId.HasValue && therapistCache.ContainsKey(s.TherapistId.Value) ? therapistCache[s.TherapistId.Value] : "?",
@@ -308,6 +319,8 @@ public partial class AppController {
     // (not yet reflected in the DB). When provided, used instead of recomputing
     // remaining from placedCount - needed for Rimpiazza-unchecked append.
     public List<RepartoRemainingOverride>? RemainingOverride { get; set; }
+    // Ripianifica: sessions being re-planned (ignored by every check).
+    public List<int>? ReplaceSlotIds { get; set; }
   }
 
   [HttpPost("/Pianificazione/RepartoAutoFill")]
@@ -321,6 +334,8 @@ public partial class AppController {
     if (therapy == null) {
       return NotFound();
     }
+
+    SetReplanExclusion(therapy.Id, request.ReplaceSlotIds);
 
     var partsRaw = _db.TherapyParts.Where(p => p.TherapyId == request.TherapyId).OrderBy(p => p.Id).ToList();
 
@@ -364,6 +379,7 @@ public partial class AppController {
 
     var results = new List<object>();
     var occurrencesPlaced = 0;
+    string? firstSkipReason = null;
 
     foreach (var date in candidates) {
       if (runningRemaining.Values.Sum() <= 0 || occurrencesPlaced >= targetOccurrences) {
@@ -385,24 +401,25 @@ public partial class AppController {
       }
 
       // Hard block: any 15-min slot in the whole block's range being fully saturated
-      // skips this date entirely (silently, doesn't count - same as vacation/unavailable
-      // in the Palestra flow).
-      var hardBlocked = false;
-      for (var slot = request.TimeSlot; slot < cursor; slot++) {
-        if (IsRepartoSlotSaturated(date, slot, repartoRate, coveringRate, relevantTherapists)) {
-          hardBlocked = true;
-          break;
-        }
-      }
+      // skips this date entirely (doesn't count - same as vacation/unavailable in the
+      // Palestra flow). The first reason is kept for the failure message.
+      var saturation = DescribeRepartoSaturation(date, request.TimeSlot, cursor - request.TimeSlot, repartoRate, coveringRate, relevantTherapists);
 
-      if (hardBlocked) {
+      if (saturation != null) {
+        firstSkipReason ??= WithDate(date, saturation);
         continue;
       }
 
       // Soft conflict (placed and counted, just flagged): same patient already has a
       // session overlapping, or the same TherapyType already that day, for any segment.
-      var conflict = segments.Any(seg =>
-        HasPatientConflict(therapy.PatientId, date, seg.startSlot, seg.span, seg.part.TherapyTypeId));
+      string? conflictReason = null;
+      foreach (var seg in segments) {
+        conflictReason = DescribePatientConflict(therapy.PatientId, date, seg.startSlot, seg.span, seg.part.TherapyTypeId);
+        if (conflictReason != null) {
+          break;
+        }
+      }
+      var conflict = conflictReason != null;
 
       var segmentsOutput = segments.Select(s => new {
         partId = s.part.Id,
@@ -412,7 +429,7 @@ public partial class AppController {
         durationSlots = s.span
       }).ToList();
 
-      results.Add(new { date, segments = segmentsOutput, conflict });
+      results.Add(new { date, segments = segmentsOutput, conflict, conflictReason = conflictReason != null ? WithDate(date, conflictReason) : null });
 
       foreach (var p in activeParts) {
         runningRemaining[p.Part.Id]--;
@@ -421,8 +438,13 @@ public partial class AppController {
       occurrencesPlaced++;
     }
 
+    if (results.Count == 0) {
+      return BadRequest(new { message = "Impossibile pianificare da qui - " + (firstSkipReason ?? "nessuna data valida trovata") + "." });
+    }
+
     if (runningRemaining.Values.Sum() > 0 && request.Count <= 0) {
-      return BadRequest(new { message = "Non è stato possibile trovare abbastanza date valide in un intervallo ragionevole." });
+      return BadRequest(new { message = "Non è stato possibile trovare abbastanza date valide in un intervallo ragionevole."
+        + (firstSkipReason != null ? " Primo motivo - " + firstSkipReason + "." : "") });
     }
 
     return Ok(results);
@@ -441,6 +463,8 @@ public partial class AppController {
   public class RepartoAcceptRequest {
     public int TherapyId { get; set; }
     public List<RepartoAcceptPlacement> Placements { get; set; } = new();
+    // Ripianifica: sessions replaced by these placements (deleted on Accept).
+    public List<int>? ReplaceSlotIds { get; set; }
   }
 
   [HttpPost("/Pianificazione/RepartoAccept")]
@@ -458,6 +482,14 @@ public partial class AppController {
     var partsRaw = _db.TherapyParts.Where(p => p.TherapyId == request.TherapyId).ToDictionary(p => p.Id, p => p);
     var typeCache = _db.TherapyTypes.ToDictionary(t => t.Id, t => t);
 
+    // Everything below commits together or not at all - any early return rolls back.
+    using var transaction = _db.Database.BeginTransaction();
+
+    var replaceError = RemoveReplacedSlots(therapy.Id, request.ReplaceSlotIds, request.Placements.Select(p => p.Date));
+    if (replaceError != null) {
+      return BadRequest(new { message = replaceError });
+    }
+
     var (repartoRate, coveringRate) = GetRepartoRates();
     var relevantTherapists = GetRepartoCapableAndCoveringTherapists();
 
@@ -472,14 +504,11 @@ public partial class AppController {
         var type = typeCache.ContainsKey(part.TherapyTypeId) ? typeCache[part.TherapyTypeId] : null;
         var span = type != null ? GetSpanSlots(type) : 1;
 
-        for (var slot = seg.TimeSlot; slot < seg.TimeSlot + span; slot++) {
-          if (IsRepartoSlotSaturated(placement.Date, slot, repartoRate, coveringRate, relevantTherapists)) {
-            return BadRequest(new { message = "Alcuni slot non sono più validi (capacità Reparto satura). Ricontrolla la pianificazione." });
-          }
-        }
+        var reason = DescribeRepartoSaturation(placement.Date, seg.TimeSlot, span, repartoRate, coveringRate, relevantTherapists)
+          ?? DescribePatientConflict(therapy.PatientId, placement.Date, seg.TimeSlot, span, part.TherapyTypeId);
 
-        if (HasPatientConflict(therapy.PatientId, placement.Date, seg.TimeSlot, span, part.TherapyTypeId)) {
-          return BadRequest(new { message = "Sono presenti conflitti non risolti. Ricontrolla la pianificazione." });
+        if (reason != null) {
+          return BadRequest(new { message = (type?.Name ?? "Seduta") + " del " + FormatShortDate(placement.Date) + " alle " + FormatSlotTime(seg.TimeSlot) + " non più valida - " + reason + "." });
         }
       }
     }
@@ -493,6 +522,10 @@ public partial class AppController {
     therapy.Status = TherapyStatus.Scheduled;
     _db.SaveChanges();
 
-    return Ok();
+    transaction.Commit();
+
+    var warnings = GetBudgetWarningsForTherapy(therapy, request.Placements.Select(p => p.Date));
+
+    return Ok(new { warnings });
   }
 }

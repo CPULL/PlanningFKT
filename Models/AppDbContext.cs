@@ -21,10 +21,16 @@ public class AppDbContext : DbContext {
   public DbSet<AlertDismissal> AlertDismissals => Set<AlertDismissal>();
   public DbSet<AlertMarkedImportant> AlertMarkedImportants => Set<AlertMarkedImportant>();
   public DbSet<TherapistAbsenceCall> TherapistAbsenceCalls => Set<TherapistAbsenceCall>();
+  public DbSet<FoglioFirmaChecklistItem> FoglioFirmaChecklistItems => Set<FoglioFirmaChecklistItem>();
+  public DbSet<GenericRepartoWork> GenericRepartoWorks => Set<GenericRepartoWork>();
+  public DbSet<PrCode> PrCodes => Set<PrCode>();
+  public DbSet<TherapyPrCode> TherapyPrCodes => Set<TherapyPrCode>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder) {
     modelBuilder.Entity<AlertDismissal>().HasKey(d => d.Key);
     modelBuilder.Entity<AlertMarkedImportant>().HasKey(m => m.Key);
+    modelBuilder.Entity<FoglioFirmaChecklistItem>().HasKey(c => c.Key);
+    modelBuilder.Entity<GenericRepartoWork>().HasIndex(g => new { g.TherapistId, g.Date, g.TimeSlot }).IsUnique();
 
     // Patient -> Therapy (cascade: deleting a patient deletes all their therapies)
     modelBuilder.Entity<Therapy>()
@@ -154,37 +160,37 @@ public class AppDbContext : DbContext {
       .Property(c => c.DefaultDiscountPercent)
       .HasPrecision(18, 2);
 
-    // TherapyType catalog seed data (17 entries, final CPU-curated list)
-    // Category: 0 = Reparto, 1 = Palestra
-    // Type: 0 = Light, 1 = Active
-    // Color: packed 24-bit RGB int (0xRRGGBB)
-    // ModUser = 1 assumes Admin is the first Therapist row ever created (Id = 1) on a fresh DB
-    var seedDate = new DateTime(2026, 1, 1);
-    const int seedUser = 1;
+    modelBuilder.Entity<PrCode>()
+      .Property(c => c.Cost)
+      .HasPrecision(18, 2);
 
-    const int reparto = 0;
-    const int palestra = 1;
-    const int light = 0;
-    const int active = 1;
+    modelBuilder.Entity<PrCode>()
+      .HasIndex(c => c.Code)
+      .IsUnique();
 
-    modelBuilder.Entity<TherapyType>().HasData(
-      new TherapyType { Id = 1, Name = "Elettroterapia", Abbreviazione = "Elettr", Duration = 15, Category = reparto, Type = light, Color = 9489145, MaxParallelFemale = 4, MaxParallelMale = 3, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 2, Name = "Ionoforesi", Abbreviazione = "Ionof", Duration = 20, Category = reparto, Type = light, Color = 16764032, MaxParallelFemale = 1, MaxParallelMale = 1, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 3, Name = "Infrarossi", Abbreviazione = "Infrar", Duration = 15, Category = reparto, Type = light, Color = 14842205, MaxParallelFemale = 1, MaxParallelMale = 1, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 4, Name = "Massoterapia 15m", Abbreviazione = "Masso15", Duration = 15, Category = reparto, Type = active, Color = 13538264, MaxParallelFemale = null, MaxParallelMale = null, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 5, Name = "Massoterapia 30m", Abbreviazione = "Masso30", Duration = 30, Category = reparto, Type = active, Color = 13538264, MaxParallelFemale = null, MaxParallelMale = null, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 6, Name = "Mezieres", Abbreviazione = "Mez", Duration = 60, Category = palestra, Type = active, Color = 16635957, MaxParallelFemale = null, MaxParallelMale = null, TherapyWeeklyFrequency = 1, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 7, Name = "Isocinetica", Abbreviazione = "Isocin", Duration = 30, Category = palestra, Type = active, Color = 13214247, MaxParallelFemale = null, MaxParallelMale = null, TherapyWeeklyFrequency = 1, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 8, Name = "Rieducazione mot 15m", Abbreviazione = "Ried15", Duration = 15, Category = palestra, Type = active, Color = 2541274, MaxParallelFemale = null, MaxParallelMale = null, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 9, Name = "Rieducazione mot 30m", Abbreviazione = "Ried30", Duration = 30, Category = palestra, Type = active, Color = 2541274, MaxParallelFemale = null, MaxParallelMale = null, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 10, Name = "Rieducazione mot 45m", Abbreviazione = "Ried45", Duration = 45, Category = palestra, Type = active, Color = 2541274, MaxParallelFemale = null, MaxParallelMale = null, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 11, Name = "Laser", Abbreviazione = "Laser", Duration = 15, Category = reparto, Type = light, Color = 8421376, MaxParallelFemale = 2, MaxParallelMale = 2, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 12, Name = "Laser YAG", Abbreviazione = "YAG", Duration = 10, Category = reparto, Type = active, Color = 16485376, MaxParallelFemale = 1, MaxParallelMale = 1, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 13, Name = "Magneto", Abbreviazione = "Magneto", Duration = 30, Category = reparto, Type = light, Color = 7901340, MaxParallelFemale = 2, MaxParallelMale = 2, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 14, Name = "Ultrasuoni", Abbreviazione = "UltraS", Duration = 15, Category = reparto, Type = light, Color = 12433259, MaxParallelFemale = 1, MaxParallelMale = 1, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 15, Name = "Tecar", Abbreviazione = "Tecar", Duration = 30, Category = reparto, Type = active, Color = 9415055, MaxParallelFemale = 1, MaxParallelMale = 1, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 16, Name = "Onde d'urto", Abbreviazione = "OndeU", Duration = 15, Category = palestra, Type = active, Color = 15094016, MaxParallelFemale = 1, MaxParallelMale = 1, TherapyWeeklyFrequency = 2, IsActive = 1, ModDate = seedDate, ModUser = seedUser },
-      new TherapyType { Id = 17, Name = "Shock termico", Abbreviazione = "ShockT", Duration = 15, Category = reparto, Type = active, Color = 13990251, MaxParallelFemale = 1, MaxParallelMale = 1, TherapyWeeklyFrequency = 7, IsActive = 1, ModDate = seedDate, ModUser = seedUser }
-    );
+    // Therapy -> its PR codes (cascade: they go with the therapy); a PR code in
+    // use can't be deleted.
+    modelBuilder.Entity<TherapyPrCode>()
+      .HasOne<Therapy>()
+      .WithMany()
+      .HasForeignKey(c => c.TherapyId)
+      .OnDelete(DeleteBehavior.Cascade);
+
+    modelBuilder.Entity<TherapyPrCode>()
+      .HasOne<PrCode>()
+      .WithMany()
+      .HasForeignKey(c => c.PrCodeId)
+      .OnDelete(DeleteBehavior.Restrict);
+
+    // Therapy -> Pacchetto used for its price; deleting the pacchetto just
+    // clears the link.
+    modelBuilder.Entity<Therapy>()
+      .HasOne<TherapyPacket>()
+      .WithMany()
+      .HasForeignKey(t => t.TherapyPacketId)
+      .OnDelete(DeleteBehavior.SetNull);
+
+    // Seed data (TherapyType catalog, PR codes) - see DbSeeding.
+    DbSeeding.ApplyModelSeeds(modelBuilder);
   }
 }

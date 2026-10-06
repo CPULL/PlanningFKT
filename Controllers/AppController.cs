@@ -54,7 +54,15 @@ public partial class AppController : ControllerBase {
   // InProgress -> ToBeFinalized gate. Symmetric: if a Done slot gets reverted
   // after the therapy had already auto-completed, it reverts back out of
   // Completed too, so the count stays meaningful in both directions.
-  private void RecomputeTherapyCompletion(int therapyPartId) {
+  //
+  // fromStatusChange: the call comes from a single slot status change, and
+  // doneRemoved says whether that change took a Done away. Then the revert out
+  // of Completed happens only when that very change broke an exact completion
+  // (Done count now one short) - so a therapy closed by hand with "Chiudi
+  // terapia" or "Elimina -> sedute future" (fewer Done than planned) stays
+  // closed (CPU: Chiudi is just a status change). Any other caller (therapy
+  // edits) re-evaluates both directions freely.
+  private void RecomputeTherapyCompletion(int therapyPartId, bool fromStatusChange = false, bool doneRemoved = false) {
     var part = _db.TherapyParts.Find(therapyPartId);
     if (part == null) {
       return;
@@ -86,13 +94,38 @@ public partial class AppController : ControllerBase {
       }
 
       _db.SaveChanges();
-    } else if (!isComplete && therapy.Status == TherapyStatus.Completed) {
+    } else if (!isComplete && therapy.Status == TherapyStatus.Completed
+      && (!fromStatusChange || (doneRemoved && totalDone == totalRequired - 1))) {
       // FoglioFirmaStatus deliberately does NOT revert here - once advanced, it
       // stays put even if a Done slot later gets un-marked (CPU's chosen
       // default: safer than silently reopening finalized paperwork).
       therapy.Status = TherapyStatus.Scheduled;
       _db.SaveChanges();
     }
+  }
+
+  // A Pianificata therapy left with no sessions at all (e.g. "Cancella tutte le
+  // sedute future" from its first day, or every session removed one by one) is
+  // really back to Da pianificare - otherwise it showed up as "Terapia da
+  // completare" with nothing planned inside. Same rule runs once at startup for
+  // existing data (Program.cs).
+  private void RevertToBeScheduledIfEmpty(int therapyId) {
+    var therapy = _db.Therapies.Find(therapyId);
+
+    if (therapy == null || therapy.Status != TherapyStatus.Scheduled) {
+      return;
+    }
+
+    var partIds = _db.TherapyParts.Where(p => p.TherapyId == therapyId).Select(p => p.Id).ToList();
+
+    if (_db.TherapySlots.Any(s => partIds.Contains(s.TherapyPartId) && s.Status != TherapySlotStatus.Rescheduled)) {
+      return;
+    }
+
+    therapy.Status = TherapyStatus.ToBeScheduled;
+    therapy.ModDate = DateTime.Now;
+    therapy.ModUser = GetCurrentTherapistId() ?? therapy.ModUser;
+    _db.SaveChanges();
   }
 
   private Dictionary<int, TherapyPart> GetPartCache() {

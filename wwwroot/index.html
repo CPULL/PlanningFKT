@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Planning FKT</title>
   <link rel="icon" type="image/png" href="planningfkt.png">
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=20261004121639">
 </head>
 <body>
 
@@ -45,7 +45,8 @@
           <button type="button" class="nav-item nav-item-sub" data-view="impostazioni">Impostazioni</button>
           <button type="button" class="nav-item nav-item-sub" data-view="pacchetti">Pacchetti</button>
           <button type="button" class="nav-item nav-item-sub" data-view="gestisciAssenza">Gestisci assenza</button>
-          <button type="button" class="nav-item nav-item-sub" data-view="fogliFirma">Fogli firma per domani</button>
+          <button type="button" class="nav-item nav-item-sub" data-view="fogliFirma">Fogli firma</button>
+          <button type="button" class="nav-item nav-item-sub" data-view="fatturato">Fatturato</button>
         </div>
       </nav>
     </aside>
@@ -74,6 +75,11 @@
 
           <div id="account-menu" class="account-menu">
             <button type="button" id="account-menu-button" class="account-menu-button"></button>
+            <div id="presenze-options" class="presenze-options">
+              <label><input type="checkbox" id="opt-fatto-reparto" autocomplete="off"> Fatto reparto</label>
+              <label><input type="checkbox" id="opt-specialistiche" autocomplete="off"> Specialistiche</label>
+              <button type="button" id="presenze-cerca" class="presenze-cerca-btn">Cerca</button>
+            </div>
             <div id="account-menu-dropdown" class="account-menu-dropdown">
               <button type="button" id="toggle-removed" class="account-menu-item">Vedi elementi rimossi</button>
               <button type="button" id="toggle-audit" class="account-menu-item">Vedi Audit</button>
@@ -102,6 +108,7 @@
     <div class="welcome-box">
       <img src="planningfkt.png" alt="Planning FKT" class="welcome-logo">
       <h1 class="welcome-title">Planning FKT</h1>
+      <div class="welcome-build-date" id="welcome-build-date"></div>
       <p class="welcome-greeting" id="welcome-greeting-text"></p>
       <div class="welcome-actions">
         <button type="button" id="welcome-switch-user-button" class="HelloButtons">Cambia utente</button>
@@ -111,6 +118,6 @@
   </div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20261004124449"></script>
 </body>
 </html>

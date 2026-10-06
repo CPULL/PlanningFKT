@@ -33,6 +33,9 @@ builder.Services.AddDbContext<AppDbContext>(options => {
 
 builder.Services.AddSingleton<SettingsCache>();
 
+// Daily removal of specialistica PDFs older than 1 year (see the class comment).
+builder.Services.AddHostedService<SpecialisticaCleanupService>();
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope()) {
@@ -58,65 +61,21 @@ using (var scope = app.Services.CreateScope()) {
     db.SaveChanges();
   }
 
-  if (!db.Settings.Any(s => s.Key == "AvailabilityStart")) {
-    db.Settings.Add(new Setting { Key = "AvailabilityStart", Value = 28, Sorting = 10, ModDate = DateTime.Now, ModUser = 1 }); // 07:00
-  }
+  // Settings and fixed holidays - see DbSeeding (Admin stays here).
+  DbSeeding.SeedRuntime(db);
 
-  if (!db.Settings.Any(s => s.Key == "AvailabilityEnd")) {
-    db.Settings.Add(new Setting { Key = "AvailabilityEnd", Value = 76, Sorting = 11, ModDate = DateTime.Now, ModUser = 1 }); // 19:00
-  }
+  // Pianificata therapies left with no sessions at all go back to Da pianificare
+  // (same rule as AppController.RevertToBeScheduledIfEmpty, for data from before it).
+  var emptyScheduled = db.Therapies
+    .Where(t => t.Status == TherapyStatus.Scheduled
+      && !db.TherapyParts.Any(p => p.TherapyId == t.Id
+        && db.TherapySlots.Any(s => s.TherapyPartId == p.Id && s.Status != TherapySlotStatus.Rescheduled)))
+    .ToList();
 
-  if (!db.Settings.Any(s => s.Key == "RepartoTherapyStartingTime")) {
-    db.Settings.Add(new Setting { Key = "RepartoTherapyStartingTime", Value = 5, Sorting = 20, ModDate = DateTime.Now, ModUser = 1 });
-  }
-
-  if (!db.Settings.Any(s => s.Key == "PalestraCoveringRepartoStartingTime")) {
-    db.Settings.Add(new Setting { Key = "PalestraCoveringRepartoStartingTime", Value = 5, Sorting = 21, ModDate = DateTime.Now, ModUser = 1 });
-  }
-
-  if (!db.Settings.Any(s => s.Key == "RepartoCapacityWarningThreshold")) {
-    db.Settings.Add(new Setting { Key = "RepartoCapacityWarningThreshold", Value = 75, Sorting = 30, ModDate = DateTime.Now, ModUser = 1 });
-  }
-
-  if (!db.Settings.Any(s => s.Key == "PacchettoScontoMinimo")) {
-    db.Settings.Add(new Setting { Key = "PacchettoScontoMinimo", Value = 5, Sorting = 40, ModDate = DateTime.Now, ModUser = 1 });
-  }
-
-  if (!db.Settings.Any(s => s.Key == "PacchettoScontoMassimo")) {
-    db.Settings.Add(new Setting { Key = "PacchettoScontoMassimo", Value = 25, Sorting = 41, ModDate = DateTime.Now, ModUser = 1 });
-  }
-
-
-
-	db.SaveChanges();
-
-  var fixedHolidays = new (string Name, int Month, int Day)[] {
-    ("Capodanno", 1, 1),
-    ("Epifania", 1, 6),
-    ("Liberazione", 4, 25),
-    ("Festa del Lavoro", 5, 1),
-    ("Festa della Repubblica", 6, 2),
-    ("Ferragosto", 8, 15),
-    ("San Gennaro", 9, 19),
-    ("Ognissanti", 11, 1),
-    ("Immacolata", 12, 8),
-    ("Natale", 12, 25),
-    ("Santo Stefano", 12, 26)
-  };
-
-  foreach (var holiday in fixedHolidays) {
-    var exists = db.Vacations.Any(v =>
-      v.IsYearIndependent == 1 && v.Month == holiday.Month && v.Day == holiday.Day);
-
-    if (!exists) {
-      db.Vacations.Add(new Vacation {
-        Name = holiday.Name,
-        IsYearIndependent = 1,
-        Month = holiday.Month,
-        Day = holiday.Day,
-        IsSeeded = 1
-      });
-    }
+  foreach (var therapy in emptyScheduled) {
+    therapy.Status = TherapyStatus.ToBeScheduled;
+    therapy.ModDate = DateTime.Now;
+    therapy.ModUser = 1;
   }
 
   db.SaveChanges();

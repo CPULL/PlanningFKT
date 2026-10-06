@@ -12,7 +12,7 @@ using minerva.planningfkt.models;
 namespace minerva.planningfkt.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260828125042_InitialCreate")]
+    [Migration("20260922213358_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -61,6 +61,56 @@ namespace minerva.planningfkt.Migrations
                     b.HasKey("Key");
 
                     b.ToTable("AlertMarkedImportants");
+                });
+
+            modelBuilder.Entity("minerva.planningfkt.models.FoglioFirmaChecklistItem", b =>
+                {
+                    b.Property<long>("Key")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Key"));
+
+                    b.Property<bool>("Fatto")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateOnly>("MarkedDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("FoglioFirmaChecklistItems");
+                });
+
+            modelBuilder.Entity("minerva.planningfkt.models.GenericRepartoWork", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<int>("TherapistId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TimeSlot")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TherapistId", "Date", "TimeSlot")
+                        .IsUnique();
+
+                    b.ToTable("GenericRepartoWorks");
                 });
 
             modelBuilder.Entity("minerva.planningfkt.models.Patient", b =>
@@ -220,6 +270,9 @@ namespace minerva.planningfkt.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("EndTime")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("OverrideOperatingArea")
                         .HasColumnType("int");
 
                     b.Property<int>("StartTime")
@@ -390,6 +443,9 @@ namespace minerva.planningfkt.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("DefaultGinnasticaAttivaSlots")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("ModDate")
                         .HasColumnType("datetime(6)");
 
@@ -424,6 +480,9 @@ namespace minerva.planningfkt.Migrations
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
+
+                    b.Property<int>("GinnasticaAttivaSlots")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("ModDate")
                         .HasColumnType("datetime(6)");
@@ -473,6 +532,9 @@ namespace minerva.planningfkt.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("varchar(8)");
 
+                    b.Property<int>("AllowsGinnasticaAttiva")
+                        .HasColumnType("int");
+
                     b.Property<int>("Category")
                         .HasColumnType("int");
 
@@ -517,6 +579,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 1,
                             Abbreviazione = "Elettr",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 9489145,
                             Duration = 15,
@@ -533,6 +596,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 2,
                             Abbreviazione = "Ionof",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 16764032,
                             Duration = 20,
@@ -549,6 +613,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 3,
                             Abbreviazione = "Infrar",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 14842205,
                             Duration = 15,
@@ -565,6 +630,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 4,
                             Abbreviazione = "Masso15",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 13538264,
                             Duration = 15,
@@ -579,6 +645,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 5,
                             Abbreviazione = "Masso30",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 13538264,
                             Duration = 30,
@@ -593,6 +660,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 6,
                             Abbreviazione = "Mez",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 16635957,
                             Duration = 60,
@@ -607,6 +675,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 7,
                             Abbreviazione = "Isocin",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 13214247,
                             Duration = 30,
@@ -621,6 +690,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 8,
                             Abbreviazione = "Ried15",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 2541274,
                             Duration = 15,
@@ -635,6 +705,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 9,
                             Abbreviazione = "Ried30",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 2541274,
                             Duration = 30,
@@ -649,6 +720,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 10,
                             Abbreviazione = "Ried45",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 2541274,
                             Duration = 45,
@@ -663,6 +735,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 11,
                             Abbreviazione = "Laser",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 8421376,
                             Duration = 15,
@@ -679,6 +752,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 12,
                             Abbreviazione = "YAG",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 16485376,
                             Duration = 10,
@@ -695,6 +769,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 13,
                             Abbreviazione = "Magneto",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 7901340,
                             Duration = 30,
@@ -711,6 +786,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 14,
                             Abbreviazione = "UltraS",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 12433259,
                             Duration = 15,
@@ -727,6 +803,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 15,
                             Abbreviazione = "Tecar",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 9415055,
                             Duration = 30,
@@ -743,6 +820,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 16,
                             Abbreviazione = "OndeU",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 1,
                             Color = 15094016,
                             Duration = 15,
@@ -759,6 +837,7 @@ namespace minerva.planningfkt.Migrations
                         {
                             Id = 17,
                             Abbreviazione = "ShockT",
+                            AllowsGinnasticaAttiva = 0,
                             Category = 0,
                             Color = 13990251,
                             Duration = 15,

@@ -18,6 +18,7 @@ public partial class AppController {
     public int DayOfWeek { get; set; }
     public int StartTime { get; set; }
     public int EndTime { get; set; }
+    public int? OverrideOperatingArea { get; set; }
   }
 
   public class UserRemoveRequest {
@@ -74,7 +75,7 @@ public partial class AppController {
     var availability = _db.TherapistAvailabilities
       .Where(a => a.TherapistId == id)
       .OrderBy(a => a.DayOfWeek).ThenBy(a => a.StartTime)
-      .Select(a => new { a.DayOfWeek, a.StartTime, a.EndTime })
+      .Select(a => new { a.DayOfWeek, a.StartTime, a.EndTime, a.OverrideOperatingArea })
       .ToList();
 
     return Ok(new {
@@ -126,7 +127,8 @@ public partial class AppController {
           TherapistId = therapist.Id,
           DayOfWeek = slot.DayOfWeek,
           StartTime = slot.StartTime,
-          EndTime = slot.EndTime
+          EndTime = slot.EndTime,
+          OverrideOperatingArea = slot.OverrideOperatingArea
         });
       }
 
@@ -181,7 +183,8 @@ public partial class AppController {
           TherapistId = id,
           DayOfWeek = slot.DayOfWeek,
           StartTime = slot.StartTime,
-          EndTime = slot.EndTime
+          EndTime = slot.EndTime,
+          OverrideOperatingArea = slot.OverrideOperatingArea
         });
       }
     }
