@@ -10,10 +10,11 @@ public partial class AppController {
   // A forecast, not accounting: what the clinic expects to earn and what it has
   // earned, public (Convenzione, invoiced to the ASL) vs private (Privata and
   // Assicurazione - CPU: marginal, treated like private).
-  // A therapy's value comes from, in order:
-  //   1. its PR codes: sum of their costs, spread evenly over the therapy's sessions;
-  //   2. its Pacchetto: the pacchetto's final price, spread the same way;
-  //   3. otherwise the Tariffario: each session is worth its type's unit price.
+  // A therapy's value comes from:
+  //   - Convenzione: its PR codes only - sum of their costs, spread evenly over
+  //     the therapy's sessions; no PR codes = 0 (CPU);
+  //   - Privata/Assicurazione: its Pacchetto's final price, spread the same way,
+  //     otherwise the Tariffario: each session is worth its type's unit price.
   // Per month: planned = sessions Da fare, executed = sessions Fatto (Assente is
   // lost money, moved originals don't count). A therapy closed early simply
   // earns less. Prices are always the current ones (past months recalculated).
@@ -49,8 +50,9 @@ public partial class AppController {
       var prTotal = prLinks.Where(l => l.TherapyId == therapy.Id).Sum(l => prCosts.GetValueOrDefault(l.PrCodeId));
 
       decimal? perSession = null;
-      if (prTotal > 0 && sessions > 0) {
-        perSession = prTotal / sessions;
+      if (therapy.BillingCategory == TherapyBillingCategory.Convenzione) {
+        // CPU: no PR, no public money - never the pacchetto or the Tariffario.
+        perSession = prTotal > 0 && sessions > 0 ? prTotal / sessions : 0;
       } else if (therapy.TherapyPacketId.HasValue && packetPrices.ContainsKey(therapy.TherapyPacketId.Value) && sessions > 0) {
         perSession = packetPrices[therapy.TherapyPacketId.Value] / sessions;
       }
@@ -64,11 +66,15 @@ public partial class AppController {
   }
 
   // Totals per (year, month) for every month touched by [from, to].
-  private Dictionary<(int Year, int Month), FatturatoTotals> ComputeFatturato(DateOnly from, DateOnly to) {
+  // plannedFrom (budget rule, CPU): sessions Da fare before that day are
+  // ignored - in the past only Fatto counts.
+  private Dictionary<(int Year, int Month), FatturatoTotals> ComputeFatturato(DateOnly from, DateOnly to, DateOnly? plannedFrom = null) {
     var slots = _db.TherapySlots.AsNoTracking()
       .Where(s => s.Date >= from && s.Date <= to
         && (s.Status == TherapySlotStatus.ToBeDone || s.Status == TherapySlotStatus.Done))
       .Select(s => new { s.TherapyPartId, s.Date, s.Status })
+      .ToList()
+      .Where(s => plannedFrom == null || s.Status == TherapySlotStatus.Done || s.Date >= plannedFrom.Value)
       .ToList();
 
     var partIds = slots.Select(s => s.TherapyPartId).Distinct().ToList();
@@ -151,22 +157,71 @@ public partial class AppController {
     };
   }
 
-  // Warnings for the "95% of Fatturato Massimo ASL" rule, one per month reached
+  // ---- Budget limits (CPU) -------------------------------------------------------
+  //
+  // Year budget = 12 x the monthly Fatturato Massimo ASL. Each month:
+  // - used = its public value; past days count Fatto only, today and the
+  //   future count Fatto + Da fare (the other months use the same rule);
+  // - normal limit = the lower of the monthly setting and what the year has
+  //   left after the other months - the warning starts at 95% of it;
+  // - max limit = the lower of 130% of the monthly setting and what the year
+  //   has left after the other months - accepting a planning that goes over
+  //   it is blocked.
+  private const decimal FatturatoBudgetMaxMonthFactor = 1.3m;
+
+  private class MonthBudgetLimits {
+    public decimal Used { get; set; }
+    public decimal NormalLimit { get; set; }
+    public decimal MaxLimit { get; set; }
+  }
+
+  // Limits for every month touched by the dates - empty when no budget is set.
+  private Dictionary<(int Year, int Month), MonthBudgetLimits> GetMonthBudgetLimits(IEnumerable<DateOnly> dates) {
+    var result = new Dictionary<(int Year, int Month), MonthBudgetLimits>();
+    var budget = GetFatturatoBudget();
+    if (budget <= 0) {
+      return result;
+    }
+
+    var today = DateOnly.FromDateTime(DateTime.Today);
+    var keys = dates.Select(d => (d.Year, d.Month)).Distinct().ToList();
+
+    foreach (var year in keys.Select(k => k.Year).Distinct()) {
+      var usage = ComputeFatturato(new DateOnly(year, 1, 1), new DateOnly(year, 12, 31), today);
+      var yearUsed = usage.Where(entry => entry.Key.Year == year).Sum(entry => entry.Value.PublicTotal);
+
+      foreach (var key in keys.Where(k => k.Year == year)) {
+        var used = usage.GetValueOrDefault(key)?.PublicTotal ?? 0;
+        var yearLeft = Math.Max(0, budget * 12m - (yearUsed - used));
+        result[key] = new MonthBudgetLimits {
+          Used = used,
+          NormalLimit = Math.Min(budget, yearLeft),
+          MaxLimit = Math.Min(budget * FatturatoBudgetMaxMonthFactor, yearLeft)
+        };
+      }
+    }
+
+    return result;
+  }
+
+  private static string FormatBudgetEuro(decimal value) {
+    return Math.Round(value, 0).ToString("N0", new System.Globalization.CultureInfo("it-IT")) + " €";
+  }
+
+  // Warnings for the "95% of the month limit" rule, one per month reached
   // (CPU: alert the operator adding more Convenzione therapies).
   private List<string> GetBudgetWarnings(IEnumerable<DateOnly> dates) {
     var warnings = new List<string>();
-    var budget = GetFatturatoBudget();
-    if (budget <= 0) {
-      return warnings;
-    }
 
-    foreach (var key in dates.Select(d => (d.Year, d.Month)).Distinct().OrderBy(k => k.Year).ThenBy(k => k.Month)) {
-      var used = FatturatoForMonth(key.Year, key.Month).PublicTotal;
-      var usedPercent = used * 100m / budget;
+    foreach (var entry in GetMonthBudgetLimits(dates).OrderBy(e => e.Key.Year).ThenBy(e => e.Key.Month)) {
+      var limits = entry.Value;
+      var label = ItalianMonthNames[entry.Key.Month - 1] + " " + entry.Key.Year;
 
-      if (usedPercent >= FatturatoBudgetWarningPercent) {
-        warnings.Add("Attenzione: il Fatturato ASL di " + ItalianMonthNames[key.Month - 1] + " " + key.Year
-          + " è al " + Math.Round(usedPercent, 0) + "% del massimo (" + budget.ToString("N0", new System.Globalization.CultureInfo("it-IT")) + " €).");
+      if (limits.NormalLimit <= 0) {
+        warnings.Add("Attenzione: per " + label + " non resta budget ASL nell'anno.");
+      } else if (limits.Used * 100m / limits.NormalLimit >= FatturatoBudgetWarningPercent) {
+        warnings.Add("Attenzione: il Fatturato ASL di " + label + " è al "
+          + Math.Round(limits.Used * 100m / limits.NormalLimit, 0) + "% del limite del mese (" + FormatBudgetEuro(limits.NormalLimit) + ").");
       }
     }
 
@@ -178,6 +233,26 @@ public partial class AppController {
     return therapy.BillingCategory == TherapyBillingCategory.Convenzione
       ? GetBudgetWarnings(dates)
       : new List<string>();
+  }
+
+  // Block check for accepting a planning (CPU): call after the new sessions are
+  // saved, inside the transaction and before Commit - null when fine, else the
+  // message (returning without Commit rolls everything back). Only Convenzione.
+  private string? CheckBudgetLimitForTherapy(Therapy therapy, IEnumerable<DateOnly> dates) {
+    if (therapy.BillingCategory != TherapyBillingCategory.Convenzione) {
+      return null;
+    }
+
+    foreach (var entry in GetMonthBudgetLimits(dates).OrderBy(e => e.Key.Year).ThenBy(e => e.Key.Month)) {
+      var limits = entry.Value;
+      if (limits.Used > limits.MaxLimit) {
+        return "Budget ASL superato per " + ItalianMonthNames[entry.Key.Month - 1] + " " + entry.Key.Year
+          + ": " + FormatBudgetEuro(limits.Used) + " su un massimo di " + FormatBudgetEuro(limits.MaxLimit)
+          + ". Pianifica in un altro mese.";
+      }
+    }
+
+    return null;
   }
 
   [HttpGet("/Fatturato/Data")]

@@ -78,6 +78,12 @@ public partial class AppController {
     public DateOnly? FromDate { get; set; }
   }
 
+  private static bool IsValidBillingCategory(int category) {
+    return category == TherapyBillingCategory.Convenzione
+      || category == TherapyBillingCategory.Privata
+      || category == TherapyBillingCategory.Assicurazione;
+  }
+
   private static bool IsValidTherapyPartsList(List<TherapyPartRequest>? parts) {
     return parts != null && parts.Count > 0 && parts.All(p => p.SessionCount >= 1);
   }
@@ -313,6 +319,21 @@ public partial class AppController {
     if (plan == null) {
       return BadRequest(new { message = error });
     }
+
+    // Billing category editable any time (CPU: mistakes must be fixable). Only
+    // changes the figures, which are always recalculated. Switching to
+    // Convenzione needs at least one PR code. Not saved unless all checks pass.
+    if (!IsValidBillingCategory(request.BillingCategory)) {
+      return BadRequest(new { message = "Tipo di terapia non valido." });
+    }
+
+    var switchedToConvenzione = therapy.BillingCategory != TherapyBillingCategory.Convenzione
+      && request.BillingCategory == TherapyBillingCategory.Convenzione;
+    if (switchedToConvenzione && (request.PrCodeIds ?? new List<int>()).Count == 0) {
+      return BadRequest(new { message = "Per una terapia in Convenzione serve almeno un codice PR." });
+    }
+
+    therapy.BillingCategory = request.BillingCategory;
 
     var pricingError = ValidateTherapyPricing(therapy, request);
     if (pricingError != null) {

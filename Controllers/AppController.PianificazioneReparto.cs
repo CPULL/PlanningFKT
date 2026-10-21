@@ -522,6 +522,11 @@ public partial class AppController {
     therapy.Status = TherapyStatus.Scheduled;
     _db.SaveChanges();
 
+    var budgetError = CheckBudgetLimitForTherapy(therapy, request.Placements.Select(p => p.Date));
+    if (budgetError != null) {
+      return BadRequest(new { message = budgetError });
+    }
+
     transaction.Commit();
 
     var warnings = GetBudgetWarningsForTherapy(therapy, request.Placements.Select(p => p.Date));

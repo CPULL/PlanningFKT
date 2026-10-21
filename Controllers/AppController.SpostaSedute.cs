@@ -455,8 +455,29 @@ public partial class AppController {
     }
     _db.SaveChanges();
 
+    // Budget ASL (CPU): block when a month the sessions moved into goes over
+    // its max limit; warn at 95% of its normal limit.
+    var movedDatesByTherapy = moves
+      .Where(m => m.Date != slots.First(s => s.Id == m.SlotId).Date)
+      .GroupBy(m => _db.TherapyParts.Find(slots.First(s => s.Id == m.SlotId).TherapyPartId)!.TherapyId)
+      .ToDictionary(g => g.Key, g => g.Select(m => m.Date).ToList());
+
+    foreach (var entry in movedDatesByTherapy) {
+      var therapy = _db.Therapies.Find(entry.Key);
+      if (therapy == null) {
+        continue;
+      }
+
+      var budgetError = CheckBudgetLimitForTherapy(therapy, entry.Value);
+      if (budgetError != null) {
+        return BadRequest(new { message = budgetError });
+      }
+
+      warnings.AddRange(GetBudgetWarningsForTherapy(therapy, entry.Value));
+    }
+
     transaction.Commit();
 
-    return Ok(new { warnings });
+    return Ok(new { warnings = warnings.Distinct().ToList() });
   }
 }

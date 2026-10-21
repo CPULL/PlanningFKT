@@ -1095,6 +1095,11 @@ public partial class AppController {
       _db.SaveChanges();
     }
 
+    var budgetError = CheckBudgetLimitForTherapy(therapy, request.Placements.Select(p => p.Date));
+    if (budgetError != null) {
+      return BadRequest(new { message = budgetError });
+    }
+
     transaction.Commit();
 
     warnings.AddRange(GetBudgetWarningsForTherapy(therapy, request.Placements.Select(p => p.Date)));

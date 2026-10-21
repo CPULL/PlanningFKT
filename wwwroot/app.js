@@ -8148,32 +8148,26 @@ $(function() {
             var $therapyNameInput = $('<input type="text" class="therapy-name-input">').val(prefill ? (prefill.name || '') : '');
             $therapyFormArea.append($therapyNameInput);
 
-            // Fixed at creation (CPU's call) - editable only when creating a new
-            // therapy, shown read-only when editing an existing one.
+            // Editable any time (CPU: mistakes must be fixable) - also in Modifica.
             $therapyFormArea.append('<label>Tipo</label>');
             var billingCategoryLabels = ['Terapia in Convenzione', 'Terapia privata', 'Terapia con assicurazione/INAIL'];
-            var $billingCategorySelect = null;
-
-            if (therapy) {
-              $therapyFormArea.append($('<div></div>').text(billingCategoryLabels[therapy.billingCategory]));
-            } else {
-              $billingCategorySelect = $('<select class="therapy-billing-category"></select>');
-              billingCategoryLabels.forEach(function(label, i) {
-                $billingCategorySelect.append('<option value="' + i + '">' + label + '</option>');
-              });
-              if (renewFrom) {
-                $billingCategorySelect.val(String(renewFrom.billingCategory));
-              }
-              $therapyFormArea.append($billingCategorySelect);
+            var $billingCategorySelect = $('<select class="therapy-billing-category"></select>');
+            billingCategoryLabels.forEach(function(label, i) {
+              $billingCategorySelect.append('<option value="' + i + '">' + label + '</option>');
+            });
+            if (prefill) {
+              $billingCategorySelect.val(String(prefill.billingCategory));
             }
+            $therapyFormArea.append($billingCategorySelect);
 
-            // Pricing (CPU): PR codes for Convenzione (up to 5), otherwise one of
-            // the patient's pacchetti; nothing picked = Tariffario prices.
+            // Pricing (CPU): either PR codes for Convenzione (up to 5; none = 0
+            // in the public figures) or one of the patient's pacchetti for the
+            // others (none = Tariffario prices) - never both.
             var $pricingArea = $('<div class="therapy-pricing"></div>');
             $therapyFormArea.append($pricingArea);
 
             function currentBillingCategory() {
-              return therapy ? therapy.billingCategory : parseInt($billingCategorySelect.val(), 10);
+              return parseInt($billingCategorySelect.val(), 10);
             }
 
             function addPrSelect(prCodeId) {
@@ -8220,14 +8214,12 @@ $(function() {
               }
             }
 
-            if ($billingCategorySelect) {
-              $billingCategorySelect.on('change', function() {
-                renderPricing();
-                if (dirty) {
-                  dirty.refresh();
-                }
-              });
-            }
+            $billingCategorySelect.on('change', function() {
+              renderPricing();
+              if (dirty) {
+                dirty.refresh();
+              }
+            });
             renderPricing();
 
             var $partsContainer = $('<div class="therapy-parts-editor"></div>');
@@ -8361,11 +8353,18 @@ $(function() {
                 }
               });
               var packetVal = $pricingArea.find('.therapy-packet').val();
+              var billingCategory = currentBillingCategory();
+
+              // Switched to Convenzione in Modifica: at least one PR code (CPU).
+              if (therapy && therapy.billingCategory !== 0 && billingCategory === 0 && prCodeIds.length === 0) {
+                $therapyFormArea.find('.therapy-error').text('Per una terapia in Convenzione serve almeno un codice PR.').show();
+                return null;
+              }
 
               return {
                 patientId: id,
                 name: $therapyNameInput.val(),
-                billingCategory: therapy ? therapy.billingCategory : parseInt($billingCategorySelect.val(), 10),
+                billingCategory: billingCategory,
                 prCodeIds: prCodeIds,
                 therapyPacketId: packetVal ? parseInt(packetVal, 10) : null,
                 parts: parts,
